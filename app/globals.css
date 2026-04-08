@@ -1,26 +1,99 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Light mode */
+:root {
+  --bg-page: #f9fafb;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --bg-hover: #f3f4f6;
+  --bg-muted: #f3f4f6;
+  --border-color: #e5e7eb;
+  --text-primary: #1f2937;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+  --text-inverted: #ffffff;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --focus-ring: #f97316;
+  --z-header: 30;
+  --z-sticky: 35;
+  --z-overlay: 40;
+  --z-drawer: 50;
+  --z-modal: 60;
+  --z-toast: 70;
+
+  --brand-primary: #f97316;
+  --brand-primary-hover: #ea580c;
+  --brand-primary-light: #fff7ed;
+  --brand-primary-muted: rgba(249,115,22,0.10);
+
+  --status-success-bg: #f0fdf4;
+  --status-success-text: #16a34a;
+  --status-error-bg: #fef2f2;
+  --status-error-text: #dc2626;
+
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.10);
+  --card-radius: 1rem;
+
+  /* Store theme vars — overridden per store in future */
+  --store-primary: var(--brand-primary);
+  --store-primary-hover: var(--brand-primary-hover);
+  --store-primary-light: var(--brand-primary-light);
+}
+
+/* Dark mode */
+.dark {
+  --bg-page: #111827;
+  --bg-card: #1f2937;
+  --bg-input: #374151;
+  --bg-hover: #374151;
+  --bg-muted: #374151;
+  --border-color: #374151;
+  --text-primary: #f9fafb;
+  --text-secondary: #d1d5db;
+  --text-muted: #6b7280;
+  --text-inverted: #111827;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.3);
+  --focus-ring: #fb923c;
+
+  --brand-primary: #fb923c;
+  --brand-primary-hover: #f97316;
+  --brand-primary-light: rgba(249,115,22,0.15);
+  --brand-primary-muted: rgba(249,115,22,0.08);
+
+  --status-success-bg: rgba(22,163,74,0.15);
+  --status-success-text: #4ade80;
+  --status-error-bg: rgba(220,38,38,0.15);
+  --status-error-text: #f87171;
+
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.12);
+  --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus-ring) 25%, transparent);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-primary);
 }

@@ -8,9 +8,17 @@
     "start": "next start"
   },
   "dependencies": {
+    "@apollo/client": "^3.14.0",
+    "@graphql-typed-document-node/core": "^3.2.0",
+    "framer-motion": "^12.38.0",
+    "graphql": "^16.13.2",
+    "graphql-ws": "^6.0.8",
+    "lucide-react": "^1.7.0",
     "next": "16.2.2",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

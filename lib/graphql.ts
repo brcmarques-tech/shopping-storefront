@@ -1,0 +1,111 @@
+import { gql } from '@apollo/client';
+
+export const GET_PUBLIC_STOREFRONT = gql`
+  query PublicStorefront($storeId: String, $slug: String) {
+    publicStorefront(storeId: $storeId, slug: $slug) {
+      id
+      slug
+      name
+      description
+      logoUrl
+      bannerUrl
+      phone
+      street
+      number
+      complement
+      neighborhood
+      city
+      state
+      zipCode
+      isOpen
+      isActive
+      storeType
+      hasOwnDelivery
+      freeDelivery
+      deliveryFee
+      estimatedDeliveryMinutes
+      minimumOrder
+      deliveryStartTime
+      deliveryEndTime
+      freeDeliveryAbove
+      verificationLevel
+      averageRating
+      totalRatings
+      categories {
+        id
+        name
+        imageUrl
+        sortOrder
+        requiresAgeVerification
+        products {
+          id
+          name
+          description
+          price
+          promotionalPrice
+          imageUrl
+          isAvailable
+          stock
+          unit
+          isVariableWeight
+        }
+      }
+    }
+  }
+`;
+
+export const LOGIN_APP = gql`
+  mutation LoginApp($input: LoginInput!, $forceLogin: Boolean) {
+    loginApp(input: $input, forceLogin: $forceLogin) {
+      accessToken
+      user {
+        id
+        name
+        email
+        phone
+      }
+    }
+  }
+`;
+
+export const REGISTER_APP = gql`
+  mutation RegisterApp($input: RegisterAppInput!) {
+    registerApp(input: $input) {
+      accessToken
+      user {
+        id
+        name
+        email
+        phone
+      }
+    }
+  }
+`;
+
+export const CREATE_ORDER = gql`
+  mutation CreateOrder($input: CreateOrderInput!) {
+    createOrder(input: $input) {
+      id
+      orderNumber
+      status
+      total
+      subtotal
+      deliveryFee
+      createdAt
+    }
+  }
+`;
+
+export const CALCULATE_DELIVERY_FEE = gql`
+  query CalculateDeliveryFee(
+    $storeId: String!
+    $customerLatitude: Float!
+    $customerLongitude: Float!
+  ) {
+    calculateDeliveryFee(
+      storeId: $storeId
+      customerLatitude: $customerLatitude
+      customerLongitude: $customerLongitude
+    )
+  }
+`;
