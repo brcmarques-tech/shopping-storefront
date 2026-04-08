@@ -1,4 +1,4 @@
-import { gql } from '@apollo/client';
+import { gql } from "@apollo/client";
 
 export const GET_PUBLIC_STOREFRONT = gql`
   query PublicStorefront($storeId: String, $slug: String) {
@@ -50,6 +50,30 @@ export const GET_PUBLIC_STOREFRONT = gql`
           isVariableWeight
         }
       }
+    }
+  }
+`;
+
+export const GET_PUBLIC_STORES = gql`
+  query PublicStores {
+    publicStores {
+      id
+      slug
+      name
+      description
+      logoUrl
+      bannerUrl
+      city
+      state
+      isOpen
+      storeType
+      deliveryFee
+      freeDelivery
+      estimatedDeliveryMinutes
+      minimumOrder
+      verificationLevel
+      averageRating
+      totalRatings
     }
   }
 `;
