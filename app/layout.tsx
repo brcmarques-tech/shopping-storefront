@@ -13,9 +13,6 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "BCM Shopping",
   description: "Compre direto da sua loja favorita",
-  icons: {
-    icon: "/favicon.png",
-  },
 };
 
 export default function RootLayout({
