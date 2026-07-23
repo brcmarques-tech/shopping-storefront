@@ -154,6 +154,8 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         storeId={initialData.id}
         deliveryFee={initialData.deliveryFee}
         minimumOrder={initialData.minimumOrder}
+        freeDelivery={initialData.freeDelivery}
+        freeDeliveryAbove={initialData.freeDeliveryAbove}
       />
 
       {/* Dialog conflito de loja */}

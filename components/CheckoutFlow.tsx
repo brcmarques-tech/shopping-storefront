@@ -19,9 +19,11 @@ interface Props {
   storeId: string;
   deliveryFee: number;
   minimumOrder: number;
+  freeDelivery?: boolean;
+  freeDeliveryAbove?: number | null;
 }
 
-export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder }: Props) {
+export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder, freeDelivery, freeDeliveryAbove }: Props) {
   const [step, setStep] = useState<Step>('address');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
@@ -29,7 +31,14 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   const [error, setError] = useState('');
 
   const { items, subtotal, clearCart } = useCart();
-  const total = subtotal() + deliveryFee;
+  // KAN-218: aplica a MESMA regra de frete gratis do backend
+  // (orders.service.ts) — antes o checkout ignorava freeDelivery/freeDeliveryAbove
+  // e cobrava a taxa mesmo com o cabecalho anunciando "Frete gratis".
+  const isFreeDelivery =
+    !!freeDelivery ||
+    (freeDeliveryAbove != null && Number(freeDeliveryAbove) > 0 && subtotal() >= Number(freeDeliveryAbove));
+  const effectiveDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
+  const total = subtotal() + effectiveDeliveryFee;
 
   const [createOrder, { loading }] = useMutation(CREATE_ORDER);
 
@@ -223,9 +232,9 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                         <div className="flex justify-between text-sm text-[var(--text-secondary)]">
                           <span>Entrega</span>
                           <span>
-                            {deliveryFee === 0
+                            {effectiveDeliveryFee === 0
                               ? 'Grátis'
-                              : formatCurrency(deliveryFee)}
+                              : formatCurrency(effectiveDeliveryFee)}
                           </span>
                         </div>
                         <div className="flex justify-between font-bold text-[var(--text-primary)]">
