@@ -69,6 +69,10 @@ export function ProductCard({ product, storeId, storeName, onConflict }: Props) 
             src={product.imageUrl}
             alt={product.name}
             fill
+            /* KAN-249: sem `sizes`, o Next assume 100vw e serve a maior variante
+               do srcset — thumbnails de grid baixavam em resolucao cheia,
+               piorando LCP e consumo de dados justamente no mobile. */
+            sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
             className="object-cover"
           />
         ) : (

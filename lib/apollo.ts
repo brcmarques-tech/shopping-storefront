@@ -5,8 +5,21 @@ import {
   ApolloLink,
 } from '@apollo/client';
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/graphql';
+// KAN-258: o fallback silencioso para localhost era um risco real — se a env
+// nao fosse injetada no deploy, o SSR chamaria `localhost:3000` em producao e a
+// home apareceria vazia (o try/catch devolve []), sem nenhum sinal de que a
+// causa foi configuracao. Em producao agora falha ruidosamente no log.
+const API_URL = (() => {
+  const fromEnv = process.env.NEXT_PUBLIC_API_URL;
+  if (fromEnv) return fromEnv;
+  if (process.env.NODE_ENV === 'production') {
+    console.error(
+      '[storefront] NEXT_PUBLIC_API_URL nao definida em producao — usando o dominio publico como fallback. Configure a variavel no deploy.',
+    );
+    return 'https://api.bcmtech.com.br/graphql';
+  }
+  return 'http://localhost:3000/graphql';
+})();
 
 // Server-side: nova instância por request (sem state compartilhado entre requests)
 export function createServerApolloClient() {

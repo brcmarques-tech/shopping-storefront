@@ -67,12 +67,15 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const count = itemCount();
 
   const handleCheckout = () => {
-    const user = typeof window !== 'undefined' ? localStorage.getItem('user') : null;
-    if (!user) {
-      setCartOpen(false);
+    // KAN-257: decidia "esta logado?" pelo `user` do localStorage, mas quem
+    // autentica a mutation e o `token`. Com `user` presente e token expirado/
+    // ausente, o cliente ia ate o fim do checkout e so descobria o problema no
+    // confirmar (erro tardio, na pior hora). Agora exige o token.
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    setCartOpen(false);
+    if (!token) {
       setAuthOpen(true);
     } else {
-      setCartOpen(false);
       setCheckoutOpen(true);
     }
   };

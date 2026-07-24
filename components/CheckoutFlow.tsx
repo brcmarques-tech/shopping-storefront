@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { X, ChevronLeft, Loader2, CheckCircle, MapPin } from 'lucide-react';
 import { useMutation } from '@apollo/client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -41,11 +41,24 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   const total = subtotal() + effectiveDeliveryFee;
 
   const [createOrder, { loading }] = useMutation(CREATE_ORDER);
+  // KAN-247: trava sincrona de double-submit (o `loading` do useMutation so
+  // atualiza no proximo render, tarde demais para um toque duplo).
+  const submittingRef = useRef(false);
 
   const handleConfirm = async () => {
+    // KAN-247: trava SINCRONA contra envio duplicado. A unica protecao era
+    // `disabled={loading}`, mas `loading` so vira true depois do React
+    // re-renderizar — um toque duplo rapido (comum no mobile) disparava
+    // createOrder duas vezes antes disso, gerando pedido duplicado: retrabalho
+    // para a loja e risco de cobranca/entrega em dobro. O ref muda no mesmo
+    // tick, entao a segunda chamada volta imediatamente.
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+
     setError('');
     if (subtotal() < minimumOrder && minimumOrder > 0) {
       setError(`Pedido mínimo: ${formatCurrency(minimumOrder)}`);
+      submittingRef.current = false;
       return;
     }
     try {
@@ -70,6 +83,9 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
     } catch (err: unknown) {
       const e = err as { message?: string };
       setError(e.message || 'Erro ao criar pedido');
+    } finally {
+      // KAN-247: libera a trava para o usuario poder tentar de novo apos erro.
+      submittingRef.current = false;
     }
   };
 

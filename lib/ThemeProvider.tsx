@@ -49,6 +49,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const isDark = mode === "dark" || (mode === "system" && systemDark);
 
+  // KAN-257: `setMode`/`toggleTheme` ainda nao sao consumidos por nenhum
+  // componente — nao existe botao de tema no storefront. O provider NAO e
+  // codigo morto (ele aplica a classe `dark` seguindo a preferencia do
+  // sistema), entao foi mantido; o que faltava era o script inline no layout
+  // para evitar o flash no primeiro paint, ja adicionado. Estas funcoes ficam
+  // prontas para quando houver um toggle na UI.
   function setMode(newMode: ThemeMode) {
     setModeState(newMode);
     localStorage.setItem("themeMode", newMode);

@@ -97,6 +97,8 @@ function StoreCard({ store }: { store: StoreCard }) {
               src={store.bannerUrl}
               alt={store.name}
               fill
+              /* KAN-249: card de loja em grid — nunca ocupa 100vw. */
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               className="object-cover"
             />
           ) : (
@@ -119,6 +121,9 @@ function StoreCard({ store }: { store: StoreCard }) {
                 src={store.logoUrl}
                 alt={store.name}
                 fill
+                /* KAN-249: logo tem 48px fixos (w-12 h-12) — servir 100vw aqui
+                   era desperdicio puro de banda. */
+                sizes="48px"
                 className="object-cover"
               />
             ) : (

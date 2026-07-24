@@ -16,7 +16,12 @@ export function DeepLinkBanner({ storeId }: { storeId: string }) {
   if (!visible) return null;
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-[var(--z-toast)] bg-[var(--brand-primary)] text-white px-4 py-2 flex items-center justify-between gap-3 text-sm">
+    // KAN-257: era `fixed top-0`, mas o conteudo abaixo (banner da loja e a
+    // CategoryNav, que tambem e sticky top-0) nao recebia offset nenhum — os
+    // dois disputavam o topo no mobile, justamente onde este banner aparece.
+    // Agora fica no fluxo: ocupa seu espaco, empurra o conteudo e some ao
+    // rolar. E um aviso dispensavel, nao precisa ficar preso no topo.
+    <div className="relative w-full z-[var(--z-toast)] bg-[var(--brand-primary)] text-white px-4 py-2 flex items-center justify-between gap-3 text-sm">
       <div className="flex items-center gap-2">
         <Smartphone size={16} />
         <span>Melhor experiência no app</span>

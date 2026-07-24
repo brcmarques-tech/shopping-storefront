@@ -38,6 +38,10 @@ export function StoreHeader({ store }: { store: StoreData }) {
             src={store.bannerUrl}
             alt={`Banner de ${store.name}`}
             fill
+            /* KAN-249: banner ocupa a largura toda, entao 100vw e correto —
+               mas precisa ser explicito para o Next nao avisar e para o srcset
+               ser calculado com intencao. */
+            sizes="100vw"
             className="object-cover"
             priority
           />
