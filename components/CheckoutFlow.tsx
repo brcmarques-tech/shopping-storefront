@@ -30,7 +30,7 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const { items, subtotal, clearCart } = useCart();
+  const { items, subtotal, clearCart, storeId: cartStoreId } = useCart();
   // KAN-218: aplica a MESMA regra de frete gratis do backend
   // (orders.service.ts) — antes o checkout ignorava freeDelivery/freeDeliveryAbove
   // e cobrava a taxa mesmo com o cabecalho anunciando "Frete gratis".
@@ -56,6 +56,17 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
     submittingRef.current = true;
 
     setError('');
+    // O carrinho é global e pertence a UMA loja (cartStoreId). Se o usuário
+    // abre outra loja e finaliza por aqui, os itens são da loja do carrinho mas
+    // o storeId da página é outro — o pedido sairia com itens de uma loja
+    // atribuídos a outra (erro no backend ou pedido corrompido). Bloqueia.
+    if (cartStoreId && cartStoreId !== storeId) {
+      setError(
+        'Seu carrinho é de outra loja. Abra a loja correta para finalizar ou limpe o carrinho.',
+      );
+      submittingRef.current = false;
+      return;
+    }
     if (subtotal() < minimumOrder && minimumOrder > 0) {
       setError(`Pedido mínimo: ${formatCurrency(minimumOrder)}`);
       submittingRef.current = false;

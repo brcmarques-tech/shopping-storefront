@@ -163,7 +163,10 @@ function StoreCard({ store }: { store: StoreCard }) {
               <Truck size={11} />
               {store.freeDelivery
                 ? "Entrega grátis"
-                : `R$ ${store.deliveryFee.toFixed(2)}`}
+                : new Intl.NumberFormat("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  }).format(store.deliveryFee)}
             </span>
           </div>
         </div>

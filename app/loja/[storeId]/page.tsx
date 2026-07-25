@@ -31,9 +31,12 @@ async function fetchStorefront(storeId: string) {
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { storeId } = await params;
   const store = await fetchStorefront(storeId);
-  if (!store) return { title: 'Loja não encontrada | BCM Shopping' };
+  // O layout raiz (KAN-257) já aplica o template "%s | BCM Shopping". Repetir
+  // "| BCM Shopping" aqui gerava título duplicado ("Loja X | BCM Shopping |
+  // BCM Shopping") em todas as páginas de loja — as URLs mais compartilhadas.
+  if (!store) return { title: 'Loja não encontrada' };
   return {
-    title: `${store.name} | BCM Shopping`,
+    title: store.name,
     description: store.description || `Compre em ${store.name} direto pelo site`,
     openGraph: {
       title: store.name,
