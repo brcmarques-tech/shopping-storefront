@@ -53,7 +53,12 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   const isFreeDelivery =
     !!freeDelivery ||
     (freeDeliveryAbove != null && Number(freeDeliveryAbove) > 0 && subtotal() >= Number(freeDeliveryAbove));
-  const effectiveDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
+  // BUGFIX: `somenteRetirada` nao entrava na conta. Como o site so consegue
+  // concluir pedido de loja sem frota propria — e nesse caso envia
+  // `isPickup: true`, que faz o servidor zerar o frete — a tela dizia
+  // "Retirada no local" E somava a taxa de entrega ao mesmo tempo. O cliente
+  // confirmava um total maior do que o pedido realmente criado.
+  const effectiveDeliveryFee = somenteRetirada || isFreeDelivery ? 0 : deliveryFee;
   const total = subtotal() + effectiveDeliveryFee;
 
   const [createOrder, { loading }] = useMutation(CREATE_ORDER);
@@ -274,14 +279,16 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                           <span>Subtotal</span>
                           <span>{formatCurrency(subtotal())}</span>
                         </div>
-                        <div className="flex justify-between text-sm text-[var(--text-secondary)]">
-                          <span>Entrega</span>
-                          <span>
-                            {effectiveDeliveryFee === 0
-                              ? 'Grátis'
-                              : formatCurrency(effectiveDeliveryFee)}
-                          </span>
-                        </div>
+                        {!somenteRetirada && (
+                          <div className="flex justify-between text-sm text-[var(--text-secondary)]">
+                            <span>Entrega</span>
+                            <span>
+                              {effectiveDeliveryFee === 0
+                                ? 'Grátis'
+                                : formatCurrency(effectiveDeliveryFee)}
+                            </span>
+                          </div>
+                        )}
                         <div className="flex justify-between font-bold text-[var(--text-primary)]">
                           <span>Total</span>
                           <span>{formatCurrency(total)}</span>
