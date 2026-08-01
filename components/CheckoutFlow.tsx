@@ -2,10 +2,10 @@
 
 import { useRef, useState } from 'react';
 import { X, ChevronLeft, Loader2, CheckCircle, MapPin } from 'lucide-react';
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '@/lib/useCart';
-import { CREATE_ORDER } from '@/lib/graphql';
+import { CREATE_ORDER, GET_MINIMUM_ORDER_PLATFORM } from '@/lib/graphql';
 
 type Step = 'address' | 'payment' | 'confirm' | 'success';
 
@@ -58,6 +58,11 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   // `isPickup: true`, que faz o servidor zerar o frete — a tela dizia
   // "Retirada no local" E somava a taxa de entrega ao mesmo tempo. O cliente
   // confirmava um total maior do que o pedido realmente criado.
+  const { data: minPlatData } = useQuery(GET_MINIMUM_ORDER_PLATFORM);
+  const minimoPlataforma = Number(minPlatData?.minimumOrderPlatform) || 0;
+  const minimoEfetivo =
+    hasOwnDelivery === false ? Math.max(minimoPlataforma, minimumOrder) : minimumOrder;
+
   const effectiveDeliveryFee = somenteRetirada || isFreeDelivery ? 0 : deliveryFee;
   const total = subtotal() + effectiveDeliveryFee;
 
@@ -88,8 +93,10 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
       submittingRef.current = false;
       return;
     }
-    if (subtotal() < minimumOrder && minimumOrder > 0) {
-      setError(`Pedido mínimo: ${formatCurrency(minimumOrder)}`);
+    // Mesma regra do backend: sem frota propria, vale o MAIOR entre o minimo da
+    // loja e o da plataforma.
+    if (subtotal() < minimoEfetivo && minimoEfetivo > 0) {
+      setError(`Pedido mínimo: ${formatCurrency(minimoEfetivo)}`);
       submittingRef.current = false;
       return;
     }

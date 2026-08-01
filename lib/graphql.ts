@@ -133,3 +133,13 @@ export const CALCULATE_DELIVERY_FEE = gql`
     )
   }
 `;
+
+// O backend exige max(minimoDaPlataforma, minimoDaLoja) quando a loja NAO tem
+// frota propria. O site so validava o minimo da LOJA, entao um carrinho abaixo
+// do minimo da plataforma passava por toda a tela de endereco e so era recusado
+// no "Confirmar pedido", com a mensagem crua do servidor.
+export const GET_MINIMUM_ORDER_PLATFORM = gql`
+  query MinimumOrderPlatform {
+    minimumOrderPlatform
+  }
+`;
