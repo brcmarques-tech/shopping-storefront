@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StoreHeader } from './StoreHeader';
@@ -63,8 +63,23 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
 
-  const { itemCount } = useCart();
+  const { itemCount, items } = useCart();
   const count = itemCount();
+
+  // O backend exige confirmacao explicita de maioridade quando o pedido tem
+  // item de categoria +18 — o site nunca oferecia essa confirmacao, entao esses
+  // pedidos morriam no "Confirmar pedido" com um erro sem saida. Aqui
+  // descobrimos, a partir do proprio catalogo ja carregado no SSR, se o carrinho
+  // tem algum item restrito.
+  const idsRestritos = useMemo(() => {
+    const set = new Set<string>();
+    for (const cat of initialData.categories || []) {
+      if (!cat.requiresAgeVerification) continue;
+      for (const p of cat.products || []) set.add(p.id);
+    }
+    return set;
+  }, [initialData.categories]);
+  const temItemMaiorDeIdade = items.some((i) => idsRestritos.has(i.productId));
 
   const handleCheckout = () => {
     // KAN-257: decidia "esta logado?" pelo `user` do localStorage, mas quem
@@ -159,6 +174,8 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         minimumOrder={initialData.minimumOrder}
         freeDelivery={initialData.freeDelivery}
         freeDeliveryAbove={initialData.freeDeliveryAbove}
+        hasOwnDelivery={initialData.hasOwnDelivery}
+        hasAgeRestrictedItem={temItemMaiorDeIdade}
       />
 
       {/* Dialog conflito de loja */}

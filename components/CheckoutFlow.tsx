@@ -21,9 +21,25 @@ interface Props {
   minimumOrder: number;
   freeDelivery?: boolean;
   freeDeliveryAbove?: number | null;
+  /**
+   * BUGFIX: o checkout mandava `paymentMethod: 'ON_DELIVERY'` fixo e nunca
+   * `isPickup`. O backend recusa exatamente essa combinacao quando a loja NAO
+   * tem frota propria ("Pagamento na entrega nao disponivel para esta loja"),
+   * entao 100% dos pedidos pelo site falhavam no ultimo toque para toda loja
+   * que usa entregadores da plataforma — e o site nao oferece nenhuma outra
+   * forma de pagamento nem a opcao de retirada. O dado ja vinha do servidor e
+   * simplesmente nao era usado.
+   */
+  hasOwnDelivery?: boolean;
+  /** Ha item +18 no carrinho? O backend exige confirmacao explicita. */
+  hasAgeRestrictedItem?: boolean;
 }
 
-export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder, freeDelivery, freeDeliveryAbove }: Props) {
+export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder, freeDelivery, freeDeliveryAbove, hasOwnDelivery, hasAgeRestrictedItem }: Props) {
+  // Sem frota propria o site so consegue concluir na modalidade RETIRADA
+  // (pagamento na retirada) — que o backend aceita.
+  const somenteRetirada = hasOwnDelivery === false;
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [step, setStep] = useState<Step>('address');
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
@@ -84,6 +100,8 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
             })),
             deliveryAddress: address,
             paymentMethod: 'ON_DELIVERY',
+            isPickup: somenteRetirada,
+            ageVerified: hasAgeRestrictedItem ? ageConfirmed : undefined,
             notes,
           },
         },
@@ -273,13 +291,36 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                       <div className="text-xs text-[var(--text-muted)] bg-[var(--bg-muted)] rounded-xl p-3">
                         📍 {address}
                         <br />
-                        💳 Pagamento na entrega
+                        {somenteRetirada ? '🏪 Retirada no local — pague ao retirar' : '💳 Pagamento na entrega'}
                         {notes && <><br />📝 {notes}</>}
                       </div>
 
+                      {somenteRetirada && (
+                        <div className="text-xs rounded-xl p-3 bg-amber-50 text-amber-900 border border-amber-200">
+                          Esta loja usa entregadores da plataforma, e o site aceita
+                          apenas <strong>retirada no local</strong>. Para receber em
+                          casa, faça o pedido pelo aplicativo.
+                        </div>
+                      )}
+
+                      {hasAgeRestrictedItem && (
+                        <label className="flex items-start gap-2 text-xs rounded-xl p-3 bg-red-50 text-red-900 border border-red-200 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={ageConfirmed}
+                            onChange={(e) => setAgeConfirmed(e.target.checked)}
+                            className="mt-0.5"
+                          />
+                          <span>
+                            Este pedido contém produto com restrição de idade.
+                            Confirmo que tenho <strong>18 anos ou mais</strong>.
+                          </span>
+                        </label>
+                      )}
+
                       <button
                         onClick={handleConfirm}
-                        disabled={loading}
+                        disabled={loading || (hasAgeRestrictedItem && !ageConfirmed)}
                         className="w-full py-3 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-xl disabled:opacity-60 flex items-center justify-center gap-2"
                       >
                         {loading && <Loader2 size={16} className="animate-spin" />}
