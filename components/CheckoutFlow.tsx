@@ -33,9 +33,11 @@ interface Props {
   hasOwnDelivery?: boolean;
   /** Ha item +18 no carrinho? O backend exige confirmacao explicita. */
   hasAgeRestrictedItem?: boolean;
+  /** Loja aberta AGORA (revalidada no cliente) — fechada bloqueia o confirmar. */
+  storeOpen?: boolean;
 }
 
-export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder, freeDelivery, freeDeliveryAbove, hasOwnDelivery, hasAgeRestrictedItem }: Props) {
+export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder, freeDelivery, freeDeliveryAbove, hasOwnDelivery, hasAgeRestrictedItem, storeOpen }: Props) {
   // Sem frota propria o site so consegue concluir na modalidade RETIRADA
   // (pagamento na retirada) — que o backend aceita.
   const somenteRetirada = hasOwnDelivery === false;
@@ -100,6 +102,14 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
       submittingRef.current = false;
       return;
     }
+    // KAN-282: a loja pode ter fechado enquanto o cliente montava o pedido
+    // (o isOpen do SSR nao era revalidado). O servidor rejeita de qualquer
+    // forma; aqui a mensagem chega ANTES de o cliente achar que concluiu.
+    if (storeOpen === false) {
+      setError('A loja está fechada no momento. Seu carrinho fica salvo para quando ela reabrir.');
+      submittingRef.current = false;
+      return;
+    }
     try {
       const { data } = await createOrder({
         variables: {
@@ -109,6 +119,11 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
               productId: i.productId,
               quantity: i.quantity,
               notes: i.notes,
+              // KAN-282: sem o peso, o servidor tratava produto de peso
+              // variavel como unidade e cobrava o preco DO KG por peca.
+              ...(i.isVariableWeight && i.weightGrams
+                ? { weightGrams: i.weightGrams }
+                : {}),
             })),
             deliveryAddress: address,
             paymentMethod: 'ON_DELIVERY',

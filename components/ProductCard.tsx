@@ -1,8 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { Plus } from 'lucide-react';
-import { useCart } from '@/lib/useCart';
+import { Plus, Minus } from 'lucide-react';
+import { useCart, formatWeight } from '@/lib/useCart';
 import { useState } from 'react';
 
 interface Product {
@@ -29,17 +29,28 @@ interface Props {
   product: Product;
   storeId: string;
   storeName: string;
+  /** Loja aberta AGORA (revalidado no cliente) — fechada esconde o botao. */
+  storeOpen: boolean;
   onConflict: (product: Product) => void;
 }
 
-export function ProductCard({ product, storeId, storeName, onConflict }: Props) {
+export function ProductCard({ product, storeId, storeName, storeOpen, onConflict }: Props) {
   const { addItem, items } = useCart();
   const [added, setAdded] = useState(false);
+  // Seletor de peso (KAN-282): mesmo padrao do app — 500g default, passos de
+  // 50g, minimo 50g. Sem ele, o site vendia o PRECO POR KG como preco unitario
+  // e criava pedido sem peso nenhum.
+  const [pesoAberto, setPesoAberto] = useState(false);
+  const [pesoGramas, setPesoGramas] = useState(500);
 
   const cartItem = items.find((i) => i.productId === product.id);
   const displayPrice = product.promotionalPrice ?? product.price;
 
   const handleAdd = () => {
+    if (product.isVariableWeight && !pesoAberto) {
+      setPesoAberto(true);
+      return;
+    }
     const result = addItem(storeId, storeName, {
       productId: product.id,
       name: product.name,
@@ -47,11 +58,20 @@ export function ProductCard({ product, storeId, storeName, onConflict }: Props) 
       promotionalPrice: product.promotionalPrice,
       imageUrl: product.imageUrl,
       quantity: 1,
+      ...(product.isVariableWeight
+        ? {
+            isVariableWeight: true,
+            unit: product.unit || 'kg',
+            weightGrams: pesoGramas,
+          }
+        : {}),
+      stock: product.stock,
     });
     if (result === 'conflict') {
       onConflict(product);
       return;
     }
+    setPesoAberto(false);
     setAdded(true);
     setTimeout(() => setAdded(false), 1200);
   };
@@ -102,6 +122,12 @@ export function ProductCard({ product, storeId, storeName, onConflict }: Props) 
           <div>
             <p className="text-base font-bold text-[var(--text-primary)]">
               {formatCurrency(displayPrice)}
+              {/* KAN-282: sem a unidade, R$ 79,90/kg parecia preco da peca */}
+              {product.isVariableWeight && (
+                <span className="text-xs font-normal text-[var(--text-muted)]">
+                  /{product.unit || 'kg'}
+                </span>
+              )}
             </p>
             {product.promotionalPrice && (
               <p className="text-xs text-[var(--text-muted)] line-through">
@@ -110,7 +136,7 @@ export function ProductCard({ product, storeId, storeName, onConflict }: Props) 
             )}
           </div>
 
-          {product.isAvailable && (
+          {product.isAvailable && storeOpen && (
             <button
               onClick={handleAdd}
               className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
@@ -120,13 +146,50 @@ export function ProductCard({ product, storeId, storeName, onConflict }: Props) 
               }`}
             >
               {cartItem ? (
-                <span className="text-xs font-bold">{cartItem.quantity}</span>
+                <span className="text-xs font-bold">
+                  {cartItem.isVariableWeight && cartItem.weightGrams
+                    ? formatWeight(cartItem.weightGrams)
+                    : cartItem.quantity}
+                </span>
               ) : (
                 <Plus size={16} />
               )}
             </button>
           )}
         </div>
+
+        {/* Seletor de peso (produto de peso variavel) */}
+        {pesoAberto && product.isAvailable && storeOpen && (
+          <div className="mt-2 flex items-center justify-between gap-2 bg-[var(--bg-muted)] rounded-xl p-2">
+            <button
+              onClick={() => pesoGramas > 50 && setPesoGramas(pesoGramas - 50)}
+              disabled={pesoGramas <= 50}
+              className="w-7 h-7 rounded-full bg-[var(--bg-card)] flex items-center justify-center disabled:opacity-40"
+            >
+              <Minus size={14} className="text-[var(--text-secondary)]" />
+            </button>
+            <div className="text-center leading-tight">
+              <p className="text-sm font-bold text-[var(--text-primary)]">
+                {formatWeight(pesoGramas)}
+              </p>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                {formatCurrency(Math.round((displayPrice * pesoGramas) / 10) / 100)}
+              </p>
+            </div>
+            <button
+              onClick={() => setPesoGramas(pesoGramas + 50)}
+              className="w-7 h-7 rounded-full bg-[var(--bg-card)] flex items-center justify-center"
+            >
+              <Plus size={14} className="text-[var(--text-secondary)]" />
+            </button>
+            <button
+              onClick={handleAdd}
+              className="px-3 py-1.5 bg-[var(--brand-primary)] text-white rounded-lg text-xs font-semibold"
+            >
+              OK
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

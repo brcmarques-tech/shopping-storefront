@@ -54,6 +54,19 @@ export const GET_PUBLIC_STOREFRONT = gql`
   }
 `;
 
+// KAN-282: o isOpen da pagina e um snapshot do SSR e nunca era revalidado —
+// quem abria a pagina 17:50 e confirmava 18:10 via "Aberto" o tempo todo e so
+// descobria a loja fechada no ultimo toque do checkout. Esta query leve roda em
+// polling no cliente.
+export const GET_STORE_STATUS = gql`
+  query StoreStatus($storeId: String, $slug: String) {
+    publicStorefront(storeId: $storeId, slug: $slug) {
+      id
+      isOpen
+    }
+  }
+`;
+
 export const GET_PUBLIC_STORES = gql`
   query PublicStores {
     publicStores {

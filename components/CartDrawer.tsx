@@ -1,7 +1,7 @@
 'use client';
 
 import { X, Minus, Plus, Trash2, ShoppingCart } from 'lucide-react';
-import { useCart } from '@/lib/useCart';
+import { useCart, itemTotal, formatWeight } from '@/lib/useCart';
 import { motion, AnimatePresence } from 'framer-motion';
 
 function formatCurrency(value: number) {
@@ -15,10 +15,11 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCheckout: () => void;
+  storeOpen: boolean;
 }
 
-export function CartDrawer({ open, onClose, onCheckout }: Props) {
-  const { items, updateQuantity, removeItem, clearCart, subtotal, storeName } =
+export function CartDrawer({ open, onClose, onCheckout, storeOpen }: Props) {
+  const { items, updateQuantity, updateWeight, removeItem, clearCart, subtotal, storeName } =
     useCart();
 
   return (
@@ -88,36 +89,75 @@ export function CartDrawer({ open, onClose, onCheckout }: Props) {
                         {item.name}
                       </p>
                       <p className="text-xs text-[var(--brand-primary)] font-semibold mt-0.5">
-                        {formatCurrency(
-                          (item.promotionalPrice ?? item.price) * item.quantity,
+                        {/* KAN-282: itemTotal sabe calcular peso variavel
+                            (preco/kg * gramas) — antes preco/kg era somado como
+                            preco unitario */}
+                        {formatCurrency(itemTotal(item))}
+                        {item.isVariableWeight && item.weightGrams && (
+                          <span className="text-[var(--text-muted)] font-normal">
+                            {' '}· {formatWeight(item.weightGrams)}
+                          </span>
                         )}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() =>
-                          updateQuantity(item.productId, item.quantity - 1)
-                        }
-                        className="w-6 h-6 rounded-full bg-[var(--bg-card)] flex items-center justify-center"
-                      >
-                        {item.quantity === 1 ? (
-                          <Trash2 size={12} className="text-[var(--status-error-text)]" />
-                        ) : (
-                          <Minus size={12} className="text-[var(--text-secondary)]" />
-                        )}
-                      </button>
-                      <span className="text-sm font-bold text-[var(--text-primary)] w-5 text-center">
-                        {item.quantity}
-                      </span>
-                      <button
-                        onClick={() =>
-                          updateQuantity(item.productId, item.quantity + 1)
-                        }
-                        className="w-6 h-6 rounded-full bg-[var(--brand-primary)] text-white flex items-center justify-center"
-                      >
-                        <Plus size={12} />
-                      </button>
+                      {item.isVariableWeight ? (
+                        <>
+                          <button
+                            onClick={() =>
+                              updateWeight(item.productId, (item.weightGrams || 0) - 50)
+                            }
+                            className="w-6 h-6 rounded-full bg-[var(--bg-card)] flex items-center justify-center"
+                          >
+                            {(item.weightGrams || 0) <= 50 ? (
+                              <Trash2 size={12} className="text-[var(--status-error-text)]" />
+                            ) : (
+                              <Minus size={12} className="text-[var(--text-secondary)]" />
+                            )}
+                          </button>
+                          <span className="text-sm font-bold text-[var(--text-primary)] w-10 text-center">
+                            {formatWeight(item.weightGrams || 0)}
+                          </span>
+                          <button
+                            onClick={() =>
+                              updateWeight(item.productId, (item.weightGrams || 0) + 50)
+                            }
+                            className="w-6 h-6 rounded-full bg-[var(--brand-primary)] text-white flex items-center justify-center"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() =>
+                              updateQuantity(item.productId, item.quantity - 1)
+                            }
+                            className="w-6 h-6 rounded-full bg-[var(--bg-card)] flex items-center justify-center"
+                          >
+                            {item.quantity === 1 ? (
+                              <Trash2 size={12} className="text-[var(--status-error-text)]" />
+                            ) : (
+                              <Minus size={12} className="text-[var(--text-secondary)]" />
+                            )}
+                          </button>
+                          <span className="text-sm font-bold text-[var(--text-primary)] w-5 text-center">
+                            {item.quantity}
+                          </span>
+                          {/* KAN-282: `stock` era buscado e nunca usado — o
+                              cliente so descobria o limite no fim do checkout */}
+                          <button
+                            onClick={() =>
+                              updateQuantity(item.productId, item.quantity + 1)
+                            }
+                            disabled={item.stock != null && item.quantity >= item.stock}
+                            className="w-6 h-6 rounded-full bg-[var(--brand-primary)] text-white flex items-center justify-center disabled:opacity-40"
+                          >
+                            <Plus size={12} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))
@@ -133,9 +173,18 @@ export function CartDrawer({ open, onClose, onCheckout }: Props) {
                     {formatCurrency(subtotal())}
                   </span>
                 </div>
+                {/* KAN-282: loja fechada deixava percorrer o checkout inteiro e
+                    so falhava no ultimo toque */}
+                {!storeOpen && (
+                  <p className="text-xs text-center text-[var(--status-error-text)]">
+                    A loja está fechada no momento. Os itens ficam salvos para
+                    quando ela reabrir.
+                  </p>
+                )}
                 <button
                   onClick={onCheckout}
-                  className="w-full py-3 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-xl transition-colors"
+                  disabled={!storeOpen}
+                  className="w-full py-3 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Finalizar pedido
                 </button>

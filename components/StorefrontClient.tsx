@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useQuery } from '@apollo/client';
 import { ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StoreHeader } from './StoreHeader';
@@ -11,6 +12,7 @@ import { AuthModal } from './AuthModal';
 import { CheckoutFlow } from './CheckoutFlow';
 import { DeepLinkBanner } from './DeepLinkBanner';
 import { useCart } from '@/lib/useCart';
+import { GET_STORE_STATUS } from '@/lib/graphql';
 
 interface StorefrontData {
   id: string;
@@ -66,6 +68,17 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const { itemCount, items } = useCart();
   const count = itemCount();
 
+  // KAN-282: `initialData.isOpen` e um snapshot do SSR. Sem revalidacao, quem
+  // deixava a aba aberta via "Aberto" para sempre, montava o carrinho, criava
+  // conta, digitava endereco — e so levava "loja fechada" no ultimo toque.
+  // Poll leve a cada 60s; enquanto nao responde, vale o snapshot.
+  const { data: statusData } = useQuery(GET_STORE_STATUS, {
+    variables: { storeId: initialData.id },
+    pollInterval: 60_000,
+    fetchPolicy: 'network-only',
+  });
+  const lojaAberta = statusData?.publicStorefront?.isOpen ?? initialData.isOpen;
+
   // O backend exige confirmacao explicita de maioridade quando o pedido tem
   // item de categoria +18 — o site nunca oferecia essa confirmacao, entao esses
   // pedidos morriam no "Confirmar pedido" com um erro sem saida. Aqui
@@ -114,6 +127,16 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         promotionalPrice: conflict.product.promotionalPrice,
         imageUrl: conflict.product.imageUrl,
         quantity: 1,
+        // KAN-282: sem isto, o caminho do conflito adicionava produto de peso
+        // variavel como UNIDADE (o mesmo bug que o card tinha).
+        ...(conflict.product.isVariableWeight
+          ? {
+              isVariableWeight: true,
+              unit: conflict.product.unit || 'kg',
+              weightGrams: 500,
+            }
+          : {}),
+        stock: conflict.product.stock,
       });
     }
     setConflict(null);
@@ -134,6 +157,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           categories={initialData.categories}
           storeId={initialData.id}
           storeName={initialData.name}
+          storeOpen={lojaAberta}
           onConflict={handleConflict}
         />
       </div>
@@ -160,6 +184,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         open={cartOpen}
         onClose={() => setCartOpen(false)}
         onCheckout={handleCheckout}
+        storeOpen={lojaAberta}
       />
       <AuthModal
         open={authOpen}
@@ -176,6 +201,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         freeDeliveryAbove={initialData.freeDeliveryAbove}
         hasOwnDelivery={initialData.hasOwnDelivery}
         hasAgeRestrictedItem={temItemMaiorDeIdade}
+        storeOpen={lojaAberta}
       />
 
       {/* Dialog conflito de loja */}

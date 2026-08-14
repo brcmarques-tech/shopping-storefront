@@ -23,10 +23,11 @@ interface Props {
   categories: Category[];
   storeId: string;
   storeName: string;
+  storeOpen: boolean;
   onConflict: (product: Product) => void;
 }
 
-export function ProductGrid({ categories, storeId, storeName, onConflict }: Props) {
+export function ProductGrid({ categories, storeId, storeName, storeOpen, onConflict }: Props) {
   const active = categories.filter((c) => c.products.length > 0);
   if (active.length === 0) {
     return (
@@ -50,6 +51,7 @@ export function ProductGrid({ categories, storeId, storeName, onConflict }: Prop
                 product={product}
                 storeId={storeId}
                 storeName={storeName}
+                storeOpen={storeOpen}
                 onConflict={onConflict}
               />
             ))}
