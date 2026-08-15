@@ -21,6 +21,9 @@ interface StorefrontData {
   description?: string;
   logoUrl?: string;
   bannerUrl?: string;
+  street?: string;
+  number?: string;
+  neighborhood?: string;
   city: string;
   state: string;
   isOpen: boolean;
@@ -211,6 +214,13 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         hasOwnDelivery={initialData.hasOwnDelivery}
         hasAgeRestrictedItem={temItemMaiorDeIdade}
         storeOpen={lojaAberta}
+        // 8.13: mesmo formato que o servidor grava no pedido de retirada
+        storeAddress={[
+          [initialData.street, initialData.number].filter(Boolean).join(', '),
+          [initialData.neighborhood, initialData.city].filter(Boolean).join(', '),
+        ]
+          .filter(Boolean)
+          .join(' - ')}
       />
 
       {/* Dialog conflito de loja */}

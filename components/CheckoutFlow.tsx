@@ -35,9 +35,11 @@ interface Props {
   hasAgeRestrictedItem?: boolean;
   /** Loja aberta AGORA (revalidada no cliente) — fechada bloqueia o confirmar. */
   storeOpen?: boolean;
+  /** Endereco fisico da loja — mostrado como local de RETIRADA (8.13). */
+  storeAddress?: string;
 }
 
-export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder, freeDelivery, freeDeliveryAbove, hasOwnDelivery, hasAgeRestrictedItem, storeOpen }: Props) {
+export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder, freeDelivery, freeDeliveryAbove, hasOwnDelivery, hasAgeRestrictedItem, storeOpen, storeAddress }: Props) {
   // Sem frota propria o site so consegue concluir na modalidade RETIRADA
   // (pagamento na retirada) — que o backend aceita.
   const somenteRetirada = hasOwnDelivery === false;
@@ -136,7 +138,9 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                 ? { weightGrams: i.weightGrams }
                 : {}),
             })),
-            deliveryAddress: address,
+            // 8.13: retirada nao tem endereco de entrega — o servidor grava o
+            // endereco DA LOJA no pedido quando isPickup e true.
+            deliveryAddress: somenteRetirada ? undefined : address,
             paymentMethod: 'ON_DELIVERY',
             isPickup: somenteRetirada,
             ageVerified: hasAgeRestrictedItem ? ageConfirmed : undefined,
@@ -204,7 +208,9 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                   )}
                   .
                   <br />
-                  Acompanhe pelo app ou aguarde o contato da loja.
+                  {somenteRetirada && storeAddress
+                    ? <>Retire seu pedido em: <strong>{storeAddress}</strong></>
+                    : 'Acompanhe pelo app ou aguarde o contato da loja.'}
                 </p>
                 {totalDivergiu && (
                   <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-muted)] rounded-xl p-3">
@@ -234,7 +240,7 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                     </button>
                   )}
                   <h2 className="flex-1 font-bold text-[var(--text-primary)]">
-                    {step === 'address' && 'Endereço de entrega'}
+                    {step === 'address' && (somenteRetirada ? 'Retirada no local' : 'Endereço de entrega')}
                     {step === 'payment' && 'Pagamento'}
                     {step === 'confirm' && 'Confirmar pedido'}
                   </h2>
@@ -252,19 +258,34 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
 
                   {step === 'address' && (
                     <>
-                      <div className="flex items-start gap-3 bg-[var(--bg-muted)] rounded-xl p-3">
-                        <MapPin size={18} className="text-[var(--brand-primary)] mt-0.5 shrink-0" />
-                        <textarea
-                          value={address}
-                          onChange={(e) => setAddress(e.target.value)}
-                          placeholder="Rua, número, bairro, complemento..."
-                          rows={3}
-                          className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none"
-                        />
-                      </div>
+                      {/* 8.13: retirada NAO pede endereco de entrega — o cliente
+                          digitava a propria casa e ficava esperando uma entrega
+                          que nunca viria. Aqui mostra ONDE retirar. */}
+                      {somenteRetirada ? (
+                        <div className="flex items-start gap-3 bg-[var(--bg-muted)] rounded-xl p-3">
+                          <MapPin size={18} className="text-[var(--brand-primary)] mt-0.5 shrink-0" />
+                          <div className="text-sm text-[var(--text-primary)]">
+                            <p className="font-semibold mb-0.5">Retire seu pedido na loja</p>
+                            <p className="text-[var(--text-secondary)]">
+                              {storeAddress || 'Endereço disponível na confirmação do pedido'}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-start gap-3 bg-[var(--bg-muted)] rounded-xl p-3">
+                          <MapPin size={18} className="text-[var(--brand-primary)] mt-0.5 shrink-0" />
+                          <textarea
+                            value={address}
+                            onChange={(e) => setAddress(e.target.value)}
+                            placeholder="Rua, número, bairro, complemento..."
+                            rows={3}
+                            className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none"
+                          />
+                        </div>
+                      )}
                       <button
                         onClick={() => {
-                          if (!address.trim()) {
+                          if (!somenteRetirada && !address.trim()) {
                             setError('Informe o endereço de entrega');
                             return;
                           }
@@ -282,10 +303,12 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                     <>
                       <div className="bg-[var(--bg-muted)] rounded-xl p-4">
                         <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">
-                          Pagamento na entrega
+                          {somenteRetirada ? 'Pagamento na retirada' : 'Pagamento na entrega'}
                         </p>
                         <p className="text-xs text-[var(--text-muted)]">
-                          Pague em dinheiro ou cartão no momento da entrega.
+                          {somenteRetirada
+                            ? 'Pague em dinheiro ou cartão ao retirar na loja.'
+                            : 'Pague em dinheiro ou cartão no momento da entrega.'}
                         </p>
                       </div>
                       <textarea
@@ -349,7 +372,10 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                       </div>
 
                       <div className="text-xs text-[var(--text-muted)] bg-[var(--bg-muted)] rounded-xl p-3">
-                        📍 {address}
+                        {/* 8.13: na retirada o endereco que importa e o DA LOJA */}
+                        {somenteRetirada
+                          ? <>🏪 Retire em: {storeAddress || 'endereço da loja'}</>
+                          : <>📍 {address}</>}
                         <br />
                         {somenteRetirada ? '🏪 Retirada no local — pague ao retirar' : '💳 Pagamento na entrega'}
                         {notes && <><br />📝 {notes}</>}
