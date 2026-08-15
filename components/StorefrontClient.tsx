@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
 import { ShoppingCart } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -67,6 +67,14 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
   const { itemCount, items } = useCart();
   const count = itemCount();
+
+  // 8.11: reconcilia o carrinho persistido com o catalogo FRESCO do SSR — preco
+  // que mudou desde a ultima visita, item que sumiu/esgotou. Sem isto o cliente
+  // confirmava um total que o servidor ja nao cobrava.
+  useEffect(() => {
+    const prods = (initialData.categories || []).flatMap((c) => c.products || []);
+    useCart.getState().syncWithCatalog(initialData.id, prods);
+  }, [initialData]);
 
   // KAN-282: `initialData.isOpen` e um snapshot do SSR. Sem revalidacao, quem
   // deixava a aba aberta via "Aberto" para sempre, montava o carrinho, criava
@@ -162,9 +170,10 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         />
       </div>
 
-      {/* FAB carrinho */}
+      {/* FAB carrinho — visivel enquanto HOUVER itens (mesmo so indisponiveis:
+          o cliente precisa conseguir abrir o carrinho para remove-los) */}
       <AnimatePresence>
-        {count > 0 && (
+        {items.length > 0 && (
           <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}

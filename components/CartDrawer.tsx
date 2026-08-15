@@ -19,8 +19,20 @@ interface Props {
 }
 
 export function CartDrawer({ open, onClose, onCheckout, storeOpen }: Props) {
-  const { items, updateQuantity, updateWeight, removeItem, clearCart, subtotal, storeName } =
-    useCart();
+  const {
+    items,
+    updateQuantity,
+    updateWeight,
+    removeItem,
+    clearCart,
+    subtotal,
+    storeName,
+    pricesUpdated,
+    dismissPricesUpdated,
+  } = useCart();
+  // 8.11: item que sumiu/esgotou desde a ultima visita bloqueia o checkout ate
+  // ser removido (remover em silencio esconderia o problema do cliente).
+  const temIndisponivel = items.some((i) => i.unavailable);
 
   return (
     <AnimatePresence>
@@ -73,6 +85,20 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen }: Props) {
 
             {/* Items */}
             <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+              {/* 8.11: o carrinho persiste entre visitas — se preco/estoque
+                  mudou desde a ultima vez, o cliente precisa saber ANTES de
+                  confirmar, nao descobrir na fatura. */}
+              {pricesUpdated && (
+                <div className="flex items-start justify-between gap-2 text-xs rounded-xl p-3 bg-amber-50 text-amber-900 border border-amber-200">
+                  <span>
+                    A loja atualizou preços ou disponibilidade desde sua última
+                    visita — os valores abaixo já estão atualizados.
+                  </span>
+                  <button onClick={dismissPricesUpdated} className="font-semibold shrink-0">
+                    OK
+                  </button>
+                </div>
+              )}
               {items.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3 text-[var(--text-muted)]">
                   <ShoppingCart size={40} />
@@ -82,12 +108,21 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen }: Props) {
                 items.map((item) => (
                   <div
                     key={item.productId}
-                    className="flex gap-3 bg-[var(--bg-muted)] rounded-xl p-3"
+                    className={`flex gap-3 rounded-xl p-3 ${
+                      item.unavailable
+                        ? 'bg-[var(--status-error-bg)] opacity-90'
+                        : 'bg-[var(--bg-muted)]'
+                    }`}
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                         {item.name}
                       </p>
+                      {item.unavailable ? (
+                        <p className="text-xs text-[var(--status-error-text)] font-semibold mt-0.5">
+                          Produto indisponível — remova para continuar
+                        </p>
+                      ) : (
                       <p className="text-xs text-[var(--brand-primary)] font-semibold mt-0.5">
                         {/* KAN-282: itemTotal sabe calcular peso variavel
                             (preco/kg * gramas) — antes preco/kg era somado como
@@ -99,8 +134,17 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen }: Props) {
                           </span>
                         )}
                       </p>
+                      )}
                     </div>
 
+                    {item.unavailable ? (
+                      <button
+                        onClick={() => removeItem(item.productId)}
+                        className="w-8 h-8 self-center rounded-full bg-[var(--bg-card)] flex items-center justify-center shrink-0"
+                      >
+                        <Trash2 size={14} className="text-[var(--status-error-text)]" />
+                      </button>
+                    ) : (
                     <div className="flex items-center gap-1.5 shrink-0">
                       {item.isVariableWeight ? (
                         <>
@@ -159,6 +203,7 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen }: Props) {
                         </>
                       )}
                     </div>
+                    )}
                   </div>
                 ))
               )}
@@ -181,9 +226,14 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen }: Props) {
                     quando ela reabrir.
                   </p>
                 )}
+                {temIndisponivel && (
+                  <p className="text-xs text-center text-[var(--status-error-text)]">
+                    Remova os itens indisponíveis para finalizar o pedido.
+                  </p>
+                )}
                 <button
                   onClick={onCheckout}
-                  disabled={!storeOpen}
+                  disabled={!storeOpen || temIndisponivel}
                   className="w-full py-3 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Finalizar pedido

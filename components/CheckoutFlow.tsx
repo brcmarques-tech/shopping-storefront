@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import { X, ChevronLeft, Loader2, CheckCircle, MapPin } from 'lucide-react';
 import { useMutation, useQuery } from '@apollo/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useCart } from '@/lib/useCart';
+import { useCart, itemTotal, formatWeight } from '@/lib/useCart';
 import { CREATE_ORDER, GET_MINIMUM_ORDER_PLATFORM } from '@/lib/graphql';
 
 type Step = 'address' | 'payment' | 'confirm' | 'success';
@@ -46,6 +46,10 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
+  // 8.11: o total que VALE e o do servidor (precos atuais) — a resposta do
+  // createOrder era descartada e o cliente ficava com o total estimado da tela.
+  const [serverTotal, setServerTotal] = useState<number | null>(null);
+  const [totalDivergiu, setTotalDivergiu] = useState(false);
   const [error, setError] = useState('');
 
   const { items, subtotal, clearCart, storeId: cartStoreId } = useCart();
@@ -110,6 +114,13 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
       submittingRef.current = false;
       return;
     }
+    // 8.11: item marcado como indisponivel na reconciliacao nao pode ir no
+    // pedido — o cliente decide (remove) em vez de o item sumir em silencio.
+    if (items.some((i) => i.unavailable)) {
+      setError('Há itens indisponíveis no carrinho. Remova-os para continuar.');
+      submittingRef.current = false;
+      return;
+    }
     try {
       const { data } = await createOrder({
         variables: {
@@ -134,6 +145,12 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
         },
       });
       setOrderNumber(data.createOrder.orderNumber);
+      const totalServidor = Number(data.createOrder.total);
+      if (Number.isFinite(totalServidor)) {
+        setServerTotal(totalServidor);
+        // centavos de tolerancia: arredondamento nao e divergencia
+        setTotalDivergiu(Math.abs(totalServidor - total) > 0.009);
+      }
       clearCart();
       setStep('success');
     } catch (err: unknown) {
@@ -150,6 +167,8 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
     setAddress('');
     setNotes('');
     setOrderNumber(null);
+    setServerTotal(null);
+    setTotalDivergiu(false);
     setError('');
     onClose();
   };
@@ -179,10 +198,20 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                   Pedido realizado!
                 </h2>
                 <p className="text-[var(--text-secondary)]">
-                  Pedido <strong>#{orderNumber}</strong> confirmado.
+                  Pedido <strong>#{orderNumber}</strong> confirmado
+                  {serverTotal != null && (
+                    <> — total <strong>{formatCurrency(serverTotal)}</strong></>
+                  )}
+                  .
                   <br />
                   Acompanhe pelo app ou aguarde o contato da loja.
                 </p>
+                {totalDivergiu && (
+                  <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-muted)] rounded-xl p-3">
+                    O total foi recalculado pela loja com os preços atuais —
+                    esse é o valor que vale para o pagamento.
+                  </p>
+                )}
                 <button
                   onClick={reset}
                   className="mt-4 w-full max-w-xs py-3 bg-[var(--brand-primary)] text-white font-semibold rounded-xl"
@@ -285,12 +314,14 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                             className="flex justify-between text-sm"
                           >
                             <span className="text-[var(--text-secondary)]">
-                              {item.quantity}x {item.name}
+                              {/* 8.11: item de peso variavel mostrava "1x" e o
+                                  preco DO KG como se fosse o total da peca */}
+                              {item.isVariableWeight && item.weightGrams
+                                ? `${formatWeight(item.weightGrams)} ${item.name}`
+                                : `${item.quantity}x ${item.name}`}
                             </span>
                             <span className="font-medium text-[var(--text-primary)]">
-                              {formatCurrency(
-                                (item.promotionalPrice ?? item.price) * item.quantity,
-                              )}
+                              {formatCurrency(itemTotal(item))}
                             </span>
                           </div>
                         ))}
