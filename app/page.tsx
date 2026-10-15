@@ -36,9 +36,15 @@ async function fetchStores(): Promise<StoreCard[]> {
   }
 }
 
+// KAN-282 (item 14): o layout raiz aplica o template "%s | BCM Shopping", entao
+// este title virava "🛒 BCM Shopping — Lojas | BCM Shopping" — a marca duas
+// vezes no resultado de busca e na aba. `absolute` entrega o titulo como esta,
+// sem o template. A home tambem ganha canonical: ela e a raiz, e sem isso
+// qualquer variante com parametro (utm de campanha) concorre com ela.
 export const metadata = {
-  title: "🛒 BCM Shopping — Lojas",
+  title: { absolute: "🛒 BCM Shopping — Lojas" },
   description: "Encontre as melhores lojas e faça seu pedido diretamente.",
+  alternates: { canonical: "/" },
 };
 
 export default async function HomePage() {

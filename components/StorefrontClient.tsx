@@ -11,7 +11,7 @@ import { CartDrawer } from './CartDrawer';
 import { AuthModal } from './AuthModal';
 import { CheckoutFlow } from './CheckoutFlow';
 import { DeepLinkBanner } from './DeepLinkBanner';
-import { useCart } from '@/lib/useCart';
+import { useCart, useCarrinhoSincronizado } from '@/lib/useCart';
 import { GET_STORE_STATUS } from '@/lib/graphql';
 
 interface StorefrontData {
@@ -68,16 +68,23 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
 
+  // KAN-282 (itens 12 e 15): hidrata o carrinho persistido FORA do render (fim
+  // do mismatch de hidratacao) e passa a ouvir as outras abas.
+  const carrinhoPronto = useCarrinhoSincronizado();
   const { itemCount, items } = useCart();
   const count = itemCount();
 
   // 8.11: reconcilia o carrinho persistido com o catalogo FRESCO do SSR — preco
   // que mudou desde a ultima visita, item que sumiu/esgotou. Sem isto o cliente
   // confirmava um total que o servidor ja nao cobrava.
+  // Depende de `carrinhoPronto`: antes da hidratacao o carrinho em memoria esta
+  // vazio e a reconciliacao nao teria nada para reconciliar — rodava a vazio e
+  // o preco velho sobrevivia. Agora roda quando o estado real ja esta carregado.
   useEffect(() => {
+    if (!carrinhoPronto) return;
     const prods = (initialData.categories || []).flatMap((c) => c.products || []);
     useCart.getState().syncWithCatalog(initialData.id, prods);
-  }, [initialData]);
+  }, [initialData, carrinhoPronto]);
 
   // KAN-282: `initialData.isOpen` e um snapshot do SSR. Sem revalidacao, quem
   // deixava a aba aberta via "Aberto" para sempre, montava o carrinho, criava
@@ -174,9 +181,11 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       </div>
 
       {/* FAB carrinho — visivel enquanto HOUVER itens (mesmo so indisponiveis:
-          o cliente precisa conseguir abrir o carrinho para remove-los) */}
+          o cliente precisa conseguir abrir o carrinho para remove-los).
+          `carrinhoPronto` evita renderizar o FAB antes da hidratacao: o HTML do
+          servidor nunca o tem, e divergir aqui era a origem do item 12. */}
       <AnimatePresence>
-        {items.length > 0 && (
+        {carrinhoPronto && items.length > 0 && (
           <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
