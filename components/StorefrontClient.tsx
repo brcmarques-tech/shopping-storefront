@@ -13,6 +13,7 @@ import { CheckoutFlow } from './CheckoutFlow';
 import { DeepLinkBanner } from './DeepLinkBanner';
 import { useCart, useCarrinhoSincronizado } from '@/lib/useCart';
 import { GET_STORE_STATUS } from '@/lib/graphql';
+import { estaLogado } from '@/lib/sessao';
 
 interface StorefrontData {
   id: string;
@@ -114,12 +115,15 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
   const handleCheckout = () => {
     // KAN-257: decidia "esta logado?" pelo `user` do localStorage, mas quem
-    // autentica a mutation e o `token`. Com `user` presente e token expirado/
+    // autentica a mutation e a SESSAO. Com `user` presente e sessao expirada/
     // ausente, o cliente ia ate o fim do checkout e so descobria o problema no
-    // confirmar (erro tardio, na pior hora). Agora exige o token.
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    // confirmar (erro tardio, na pior hora).
+    //
+    // KAN-248: a sessao deixou de ser um token no localStorage e virou cookie
+    // httpOnly; `estaLogado()` le o cookie-companheiro legivel, que nasce e
+    // morre junto com ele (ver lib/sessao.ts).
     setCartOpen(false);
-    if (!token) {
+    if (!estaLogado()) {
       setAuthOpen(true);
     } else {
       setCheckoutOpen(true);

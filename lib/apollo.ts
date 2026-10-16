@@ -1,9 +1,4 @@
-import {
-  ApolloClient,
-  InMemoryCache,
-  HttpLink,
-  ApolloLink,
-} from '@apollo/client';
+import { ApolloClient, InMemoryCache, HttpLink } from '@apollo/client';
 
 // KAN-258: o fallback silencioso para localhost era um risco real — se a env
 // nao fosse injetada no deploy, o SSR chamaria `localhost:3000` em producao e a
@@ -30,24 +25,27 @@ export function createServerApolloClient() {
   });
 }
 
-// Client-side: singleton com auth do cliente logado
+// Client-side: singleton que fala com o PROXY do proprio site
 let clientInstance: ApolloClient<object> | null = null;
 
+/**
+ * KAN-248: o navegador NAO manda mais `Authorization`, porque nao tem mais o
+ * token. Ele fala com /api/graphql (mesma origem), e e o servidor do Next que
+ * le o cookie httpOnly da sessao e autentica na API.
+ *
+ * Antes o accessToken do cliente — 7 dias de validade — ficava no
+ * localStorage, legivel por QUALQUER script que rodasse na pagina.
+ *
+ * `credentials: 'same-origin'` e o que faz o cookie viajar no fetch do Apollo.
+ * Sem isso o proxy recebe a chamada sem sessao e toda operacao autenticada
+ * (criar pedido, ver pedidos) volta como nao autorizada.
+ */
 export function getApolloClient() {
   if (typeof window === 'undefined') return createServerApolloClient();
   if (clientInstance) return clientInstance;
 
-  const authLink = new ApolloLink((operation, forward) => {
-    const token =
-      typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-    operation.setContext({
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    return forward(operation);
-  });
-
   clientInstance = new ApolloClient({
-    link: authLink.concat(new HttpLink({ uri: API_URL })),
+    link: new HttpLink({ uri: '/api/graphql', credentials: 'same-origin' }),
     cache: new InMemoryCache(),
   });
 

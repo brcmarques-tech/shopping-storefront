@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { Plus, Minus } from 'lucide-react';
 import { useCart, formatWeight } from '@/lib/useCart';
 import { useState } from 'react';
+import { propsDeImagemRemota } from '@/lib/imagemRemota';
 
 interface Product {
   id: string;
@@ -87,6 +88,7 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
+            {...propsDeImagemRemota(product.imageUrl)}
             alt={product.name}
             fill
             /* KAN-249: sem `sizes`, o Next assume 100vw e serve a maior variante

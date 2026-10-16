@@ -129,6 +129,19 @@ export const CREATE_ORDER = gql`
       subtotal
       deliveryFee
       createdAt
+      # KAN-252: o que o cliente precisa para PAGAR.
+      #
+      # No PIX o servidor gera a cobranca na criacao do pedido e devolve o
+      # copia-e-cola (pixQrCode) e a imagem do QR (pixQrCodeBase64). Sem pedir
+      # estes campos, o checkout web criava o pedido e nao tinha onde mostrar
+      # para o cliente pagar.
+      #
+      # No cartao devolve checkoutUrl — a pagina segura do provedor. O web nao
+      # tokeniza cartao: redireciona.
+      paymentMethod
+      pixQrCode
+      pixQrCodeBase64
+      checkoutUrl
     }
   }
 `;

@@ -39,8 +39,12 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       const { data } = await loginMutation({
         variables: { input: loginForm },
       });
-      localStorage.setItem('token', data.loginApp.accessToken);
-      localStorage.setItem('user', JSON.stringify(data.loginApp.user));
+      // KAN-248: o token NAO volta mais para o navegador — o proxy
+      // /api/graphql o guarda num cookie httpOnly e o arranca da resposta.
+      // Aqui so fica o nome do cliente, para a interface cumprimentar.
+      try {
+        localStorage.setItem('user', JSON.stringify(data.loginApp.user));
+      } catch {}
       onSuccess();
     } catch (err: unknown) {
       const e = err as { message?: string };
@@ -55,8 +59,10 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       const { data } = await registerMutation({
         variables: { input: registerForm },
       });
-      localStorage.setItem('token', data.registerApp.accessToken);
-      localStorage.setItem('user', JSON.stringify(data.registerApp.user));
+      // KAN-248: idem no cadastro — a sessao vem no cookie httpOnly.
+      try {
+        localStorage.setItem('user', JSON.stringify(data.registerApp.user));
+      } catch {}
       onSuccess();
     } catch (err: unknown) {
       const e = err as { message?: string };

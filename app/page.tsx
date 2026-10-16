@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createServerApolloClient } from "@/lib/apollo";
 import { GET_PUBLIC_STORES } from "@/lib/graphql";
 import { Clock, ShoppingBag, Star, Truck } from "lucide-react";
+import { propsDeImagemRemota } from '@/lib/imagemRemota';
 
 export const dynamic = "force-dynamic";
 
@@ -101,6 +102,7 @@ function StoreCard({ store }: { store: StoreCard }) {
           {store.bannerUrl ? (
             <Image
               src={store.bannerUrl}
+              {...propsDeImagemRemota(store.bannerUrl)}
               alt={store.name}
               fill
               /* KAN-249: card de loja em grid — nunca ocupa 100vw. */
@@ -125,6 +127,7 @@ function StoreCard({ store }: { store: StoreCard }) {
             {store.logoUrl ? (
               <Image
                 src={store.logoUrl}
+                {...propsDeImagemRemota(store.logoUrl)}
                 alt={store.name}
                 fill
                 /* KAN-249: logo tem 48px fixos (w-12 h-12) — servir 100vw aqui
