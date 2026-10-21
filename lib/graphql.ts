@@ -169,3 +169,34 @@ export const GET_MINIMUM_ORDER_PLATFORM = gql`
     minimumOrderPlatform
   }
 `;
+
+// Área "Minha conta" (perfil + pedidos). Vão pelo proxy /api/graphql, que
+// injeta a sessão do cookie httpOnly.
+export const ME_APP = gql`
+  query MeApp {
+    meApp {
+      id
+      name
+      email
+      phone
+    }
+  }
+`;
+
+export const MY_ORDERS = gql`
+  query MyOrders($limit: Int) {
+    myOrders(limit: $limit) {
+      id
+      orderNumber
+      status
+      total
+      createdAt
+      paymentMethod
+      store {
+        id
+        name
+        slug
+      }
+    }
+  }
+`;

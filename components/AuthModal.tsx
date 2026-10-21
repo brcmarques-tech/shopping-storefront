@@ -57,6 +57,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
         localStorage.setItem('user', JSON.stringify(data.loginApp.user));
       } catch {}
       setSessaoAtiva(false);
+      window.dispatchEvent(new Event('bcm-sessao')); // o botao de conta do topo se atualiza
       onSuccess();
     } catch (err: unknown) {
       const mensagem = (err as { message?: string })?.message || '';
@@ -93,6 +94,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       try {
         localStorage.setItem('user', JSON.stringify(data.registerApp.user));
       } catch {}
+      window.dispatchEvent(new Event('bcm-sessao'));
       onSuccess();
     } catch (err: unknown) {
       const mensagem = (err as { message?: string })?.message || '';

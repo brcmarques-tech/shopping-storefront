@@ -11,6 +11,7 @@ import { CartDrawer } from './CartDrawer';
 import { AuthModal } from './AuthModal';
 import { CheckoutFlow } from './CheckoutFlow';
 import { DeepLinkBanner } from './DeepLinkBanner';
+import { BotaoDaConta } from './BotaoDaConta';
 import { useCart, useCarrinhoSincronizado } from '@/lib/useCart';
 import { GET_STORE_STATUS } from '@/lib/graphql';
 import { estaLogado } from '@/lib/sessao';
@@ -196,6 +197,17 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       <DeepLinkBanner storeId={initialData.slug ?? initialData.id} />
 
       <div className="min-h-screen bg-[var(--bg-page)]">
+        {/* Barra do topo: volta para as lojas e acesso à conta, sempre. */}
+        <div className="bg-[var(--bg-card)] border-b border-[var(--border-color)]">
+          <div className="max-w-5xl mx-auto px-4 py-2 flex items-center gap-3">
+            <a href="/" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+              ← Lojas
+            </a>
+            <div className="ml-auto">
+              <BotaoDaConta />
+            </div>
+          </div>
+        </div>
         <StoreHeader store={initialData} />
         <CategoryNav categories={activeCategories} />
         <ProductGrid

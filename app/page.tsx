@@ -4,6 +4,7 @@ import { createServerApolloClient } from "@/lib/apollo";
 import { GET_PUBLIC_STORES } from "@/lib/graphql";
 import { Clock, ShoppingBag, Star, Truck } from "lucide-react";
 import { propsDeImagemRemota } from '@/lib/imagemRemota';
+import { BotaoDaConta } from "@/components/BotaoDaConta";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,10 @@ export default async function HomePage() {
           <span className="text-lg font-bold text-[var(--text-primary)]">
             BCM Shopping
           </span>
+          {/* Conta sempre visível: navegar é livre, comprar pede login. */}
+          <div className="ml-auto">
+            <BotaoDaConta />
+          </div>
         </div>
       </header>
 
