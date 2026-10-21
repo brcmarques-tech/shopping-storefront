@@ -95,6 +95,7 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   const [error, setError] = useState('');
 
   const { items, subtotal, clearCart, storeId: cartStoreId } = useCart();
+  const carrinhoDeOutraLoja = items.length > 0 && !!cartStoreId && cartStoreId !== storeId;
   // KAN-218: aplica a MESMA regra de frete gratis do backend
   // (orders.service.ts) — antes o checkout ignorava freeDelivery/freeDeliveryAbove
   // e cobrava a taxa mesmo com o cabecalho anunciando "Frete gratis".
@@ -638,9 +639,21 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                         </label>
                       )}
 
+                      {/* Defesa: o "Finalizar" já leva para a loja dos itens. Se
+                          mesmo assim abrir com loja trocada, o aviso aparece
+                          ANTES e o botão fica desativado — antes o aviso só
+                          surgia depois do clique, com o botão ainda ativo. */}
+                      {carrinhoDeOutraLoja && (
+                        <p className="text-xs text-[var(--status-error-text)] bg-[var(--status-error-bg)] px-3 py-2 rounded-lg">
+                          Estes itens são de outra loja.{' '}
+                          <a href={`/loja/${cartStoreId}?finalizar=1`} className="font-semibold underline">
+                            Finalizar na loja dos itens
+                          </a>
+                        </p>
+                      )}
                       <button
                         onClick={handleConfirm}
-                        disabled={loading || (hasAgeRestrictedItem && !ageConfirmed)}
+                        disabled={loading || carrinhoDeOutraLoja || (hasAgeRestrictedItem && !ageConfirmed)}
                         className="w-full py-3 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-xl disabled:opacity-60 flex items-center justify-center gap-2"
                       >
                         {loading && <Loader2 size={16} className="animate-spin" />}

@@ -16,9 +16,11 @@ interface Props {
   onClose: () => void;
   onCheckout: () => void;
   storeOpen: boolean;
+  /** Carrinho de outra loja: o botão leva para ela ("Finalizar no X"). */
+  finalizarEm?: string | null;
 }
 
-export function CartDrawer({ open, onClose, onCheckout, storeOpen }: Props) {
+export function CartDrawer({ open, onClose, onCheckout, storeOpen, finalizarEm }: Props) {
   const {
     items,
     updateQuantity,
@@ -236,7 +238,7 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen }: Props) {
                   disabled={!storeOpen || temIndisponivel}
                   className="w-full py-3 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Finalizar pedido
+                  {finalizarEm ? `Finalizar no ${finalizarEm}` : 'Finalizar pedido'}
                 </button>
               </div>
             )}

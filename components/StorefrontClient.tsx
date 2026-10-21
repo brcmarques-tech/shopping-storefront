@@ -72,8 +72,14 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   // KAN-282 (itens 12 e 15): hidrata o carrinho persistido FORA do render (fim
   // do mismatch de hidratacao) e passa a ouvir as outras abas.
   const carrinhoPronto = useCarrinhoSincronizado();
-  const { itemCount, items } = useCart();
+  const { itemCount, items, storeId: cartStoreId, storeName: cartStoreName } = useCart();
   const count = itemCount();
+
+  // O carrinho é global e pertence a UMA loja. Aberto dentro de OUTRA loja, o
+  // checkout usava frete, pedido mínimo e "loja aberta" da página — não dos
+  // itens — e só no fim dizia "abra a loja correta", com o botão ainda ativo.
+  // Agora "Finalizar" leva para a loja dos itens e abre o checkout lá.
+  const carrinhoDeOutraLoja = items.length > 0 && !!cartStoreId && cartStoreId !== initialData.id;
 
   // 8.11: reconcilia o carrinho persistido com o catalogo FRESCO do SSR — preco
   // que mudou desde a ultima visita, item que sumiu/esgotou. Sem isto o cliente
@@ -123,12 +129,29 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
     // httpOnly; `estaLogado()` le o cookie-companheiro legivel, que nasce e
     // morre junto com ele (ver lib/sessao.ts).
     setCartOpen(false);
+    if (carrinhoDeOutraLoja) {
+      window.location.assign(`/loja/${cartStoreId}?finalizar=1`);
+      return;
+    }
     if (!estaLogado()) {
       setAuthOpen(true);
     } else {
       setCheckoutOpen(true);
     }
   };
+
+  // Chegou aqui vindo de "Finalizar no <loja>" de outra página: abre o
+  // checkout assim que o carrinho hidratar, e limpa o ?finalizar da URL.
+  useEffect(() => {
+    if (!carrinhoPronto) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('finalizar') !== '1') return;
+    params.delete('finalizar');
+    const resto = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (resto ? `?${resto}` : ''));
+    if (items.length > 0 && cartStoreId === initialData.id) handleCheckout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carrinhoPronto]);
 
   const handleAuthSuccess = () => {
     setAuthOpen(false);
@@ -209,7 +232,10 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         open={cartOpen}
         onClose={() => setCartOpen(false)}
         onCheckout={handleCheckout}
-        storeOpen={lojaAberta}
+        // Carrinho de outra loja: "aberta ou fechada" é da loja dos itens, e
+        // isso se confere lá; a desta página não decide nada.
+        storeOpen={carrinhoDeOutraLoja ? true : lojaAberta}
+        finalizarEm={carrinhoDeOutraLoja ? cartStoreName || 'loja do carrinho' : null}
       />
       <AuthModal
         open={authOpen}
