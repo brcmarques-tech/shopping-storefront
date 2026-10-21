@@ -6,6 +6,13 @@ import { useMutation } from '@apollo/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LOGIN_APP, REGISTER_APP } from '@/lib/graphql';
 
+// Falha de rede ou de servidor nao e erro do cliente. O caso que escapava: com a
+// API fora, o proxy /api/graphql responde 502 e o Apollo IGNORA o corpo
+// ("Servico indisponivel") — a mensagem vira "Response not successful: Received
+// status code 502", em ingles, direto na tela.
+const FALHA_DE_REDE = /network|failed to fetch|timeout|indispon|status code 5[0-9][0-9]|response not successful/i;
+const MSG_SEM_SERVIDOR = 'Nao consegui falar com o servidor. Verifique sua conexao e tente de novo.';
+
 interface Props {
   open: boolean;
   onClose: () => void;
@@ -16,6 +23,9 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState('');
+  // Sessao unica (KAN-84): o servidor recusa o login quando a conta ja esta
+  // aberta em outro lugar. Isso nao e erro do cliente — e uma PERGUNTA.
+  const [sessaoAtiva, setSessaoAtiva] = useState(false);
 
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
@@ -32,12 +42,13 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
 
   const loading = loginLoading || registerLoading;
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleLogin = async (e: React.FormEvent | null, forcar = false) => {
+    e?.preventDefault();
     setError('');
+    if (!forcar) setSessaoAtiva(false);
     try {
       const { data } = await loginMutation({
-        variables: { input: loginForm },
+        variables: { input: loginForm, forceLogin: forcar },
       });
       // KAN-248: o token NAO volta mais para o navegador — o proxy
       // /api/graphql o guarda num cookie httpOnly e o arranca da resposta.
@@ -45,10 +56,29 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       try {
         localStorage.setItem('user', JSON.stringify(data.loginApp.user));
       } catch {}
+      setSessaoAtiva(false);
       onSuccess();
     } catch (err: unknown) {
-      const e = err as { message?: string };
-      setError(e.message || 'Erro ao entrar');
+      const mensagem = (err as { message?: string })?.message || '';
+
+      // O servidor devolve o CODIGO `ACTIVE_SESSION`. Jogar esse codigo na
+      // tela (era o que acontecia) nao diz nada para quem esta comprando: a
+      // pessoa le "ACTIVE_SESSION" em cima do formulario e conclui que o site
+      // quebrou. Aqui vira a pergunta que ele realmente representa.
+      if (mensagem.includes('ACTIVE_SESSION')) {
+        setSessaoAtiva(true);
+        setError('');
+        return;
+      }
+      if (FALHA_DE_REDE.test(mensagem)) {
+        setError(MSG_SEM_SERVIDOR);
+        return;
+      }
+      setError(
+        /credenc|senha|invalid|unauthorized/i.test(mensagem)
+          ? 'E-mail ou senha incorretos.'
+          : mensagem || 'Erro ao entrar',
+      );
     }
   };
 
@@ -65,8 +95,10 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
       } catch {}
       onSuccess();
     } catch (err: unknown) {
-      const e = err as { message?: string };
-      setError(e.message || 'Erro ao cadastrar');
+      const mensagem = (err as { message?: string })?.message || '';
+      // As validacoes do servidor ("e-mail ja cadastrado"...) vem em portugues e
+      // seguem aparecendo como estao; so a falha de rede e traduzida.
+      setError(FALHA_DE_REDE.test(mensagem) ? MSG_SEM_SERVIDOR : mensagem || 'Erro ao cadastrar');
     }
   };
 
@@ -119,6 +151,24 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
             </div>
 
             <div className="px-5 py-5">
+              {sessaoAtiva && (
+                <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2.5 text-xs text-amber-900">
+                  <p className="font-semibold mb-1">Voce ja esta conectado em outro dispositivo</p>
+                  <p className="mb-2">
+                    Sua conta so pode estar aberta em um lugar por vez. Quer entrar aqui e
+                    desconectar o outro?
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleLogin(null, true)}
+                    disabled={loading}
+                    className="w-full py-2 rounded-lg bg-amber-500 text-white font-semibold disabled:opacity-60"
+                  >
+                    {loading ? 'Entrando...' : 'Entrar aqui mesmo'}
+                  </button>
+                </div>
+              )}
+
               {error && (
                 <p className="text-xs text-[var(--status-error-text)] bg-[var(--status-error-bg)] px-3 py-2 rounded-lg mb-4">
                   {error}
