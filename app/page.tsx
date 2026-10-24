@@ -3,6 +3,8 @@ import Link from "next/link";
 import { createServerApolloClient } from "@/lib/apollo";
 import { GET_PUBLIC_STORES } from "@/lib/graphql";
 import { Clock, ShoppingBag, Star, Truck } from "lucide-react";
+import { propsDeImagemRemota } from '@/lib/imagemRemota';
+import { BotaoDaConta } from "@/components/BotaoDaConta";
 
 export const dynamic = "force-dynamic";
 
@@ -36,9 +38,15 @@ async function fetchStores(): Promise<StoreCard[]> {
   }
 }
 
+// KAN-282 (item 14): o layout raiz aplica o template "%s | BCM Shopping", entao
+// este title virava "🛒 BCM Shopping — Lojas | BCM Shopping" — a marca duas
+// vezes no resultado de busca e na aba. `absolute` entrega o titulo como esta,
+// sem o template. A home tambem ganha canonical: ela e a raiz, e sem isso
+// qualquer variante com parametro (utm de campanha) concorre com ela.
 export const metadata = {
-  title: "🛒 BCM Shopping — Lojas",
+  title: { absolute: "🛒 BCM Shopping — Lojas" },
   description: "Encontre as melhores lojas e faça seu pedido diretamente.",
+  alternates: { canonical: "/" },
 };
 
 export default async function HomePage() {
@@ -56,6 +64,10 @@ export default async function HomePage() {
           <span className="text-lg font-bold text-[var(--text-primary)]">
             BCM Shopping
           </span>
+          {/* Conta sempre visível: navegar é livre, comprar pede login. */}
+          <div className="ml-auto">
+            <BotaoDaConta />
+          </div>
         </div>
       </header>
 
@@ -95,6 +107,7 @@ function StoreCard({ store }: { store: StoreCard }) {
           {store.bannerUrl ? (
             <Image
               src={store.bannerUrl}
+              {...propsDeImagemRemota(store.bannerUrl)}
               alt={store.name}
               fill
               /* KAN-249: card de loja em grid — nunca ocupa 100vw. */
@@ -119,6 +132,7 @@ function StoreCard({ store }: { store: StoreCard }) {
             {store.logoUrl ? (
               <Image
                 src={store.logoUrl}
+                {...propsDeImagemRemota(store.logoUrl)}
                 alt={store.name}
                 fill
                 /* KAN-249: logo tem 48px fixos (w-12 h-12) — servir 100vw aqui

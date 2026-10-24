@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -66,6 +67,16 @@ interface CartStore {
   items: CartItem[];
   /** 8.11: houve mudanca de preco/disponibilidade na ultima reconciliacao. */
   pricesUpdated: boolean;
+  /**
+   * KAN-282 (item 12): o carrinho persistido ja chegava hidratado no PRIMEIRO
+   * render do cliente, enquanto no SSR ele e vazio. O servidor nao renderizava
+   * o FAB e o cliente renderizava — erro de hidratacao em producao, flicker e
+   * re-render completo da arvore. Agora a hidratacao e explicita (skipHydration)
+   * e acontece DEPOIS do primeiro render; este sinalizador diz quando o estado
+   * ja reflete o localStorage, para a UI nao mostrar carrinho antes disso.
+   * Nao e persistido (ver partialize).
+   */
+  hidratado: boolean;
   addItem: (storeId: string, storeName: string, item: CartItem) => 'added' | 'conflict';
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
@@ -86,6 +97,7 @@ export const useCart = create<CartStore>()(
       storeName: null,
       items: [],
       pricesUpdated: false,
+      hidratado: false,
 
       /**
        * 8.11: o carrinho e persistido (localStorage) com o preco DA EPOCA em
@@ -207,6 +219,62 @@ export const useCart = create<CartStore>()(
           0,
         ),
     }),
-    { name: 'bcm-cart' },
+    {
+      name: 'bcm-cart',
+      // KAN-282 (item 12): nao hidrata durante o render. `useCarrinhoSincronizado`
+      // chama rehydrate() em um efeito, entao o primeiro render do cliente e
+      // IGUAL ao HTML do servidor (carrinho vazio) e so depois o estado real
+      // aparece. Sem isto havia mismatch de hidratacao em toda visita com
+      // carrinho salvo.
+      skipHydration: true,
+      // `hidratado` e estado de runtime, nao conteudo do carrinho — nao vai para
+      // o localStorage, senao a segunda visita comecaria "hidratada" sem ter
+      // hidratado nada.
+      partialize: (s) => ({
+        storeId: s.storeId,
+        storeName: s.storeName,
+        items: s.items,
+        pricesUpdated: s.pricesUpdated,
+      }),
+    },
   ),
 );
+
+/**
+ * Liga o carrinho ao navegador. Faz duas coisas que precisam acontecer no
+ * cliente, depois do primeiro render:
+ *
+ *  1. KAN-282 (item 12) — hidrata o estado persistido fora do render, evitando o
+ *     mismatch de hidratacao. Devolve `false` ate terminar, para a UI poder
+ *     renderizar o mesmo que o SSR nesse intervalo.
+ *
+ *  2. KAN-282 (item 15) — sincroniza entre abas. O carrinho vive em
+ *     localStorage, que e compartilhado, mas o estado em memoria de cada aba
+ *     nao era. Depois de confirmar o pedido na aba A (que limpa o carrinho), a
+ *     aba B seguia exibindo os itens e confirmar la criava um SEGUNDO pedido
+ *     identico — a trava de duplo envio e por aba e nao alcanca a outra. O
+ *     evento `storage` so dispara nas OUTRAS abas, que e exatamente o caso.
+ */
+export function useCarrinhoSincronizado(): boolean {
+  const hidratado = useCart((s) => s.hidratado);
+
+  useEffect(() => {
+    const concluir = () => useCart.setState({ hidratado: true });
+    const r = useCart.persist.rehydrate() as unknown;
+    if (r && typeof (r as Promise<void>).then === 'function') {
+      (r as Promise<void>).then(concluir, concluir);
+    } else {
+      concluir();
+    }
+
+    const aoMudarOutraAba = (e: StorageEvent) => {
+      if (e.key !== 'bcm-cart') return;
+      // Rele o localStorage. `hidratado` sobrevive porque nao e persistido.
+      void useCart.persist.rehydrate();
+    };
+    window.addEventListener('storage', aoMudarOutraAba);
+    return () => window.removeEventListener('storage', aoMudarOutraAba);
+  }, []);
+
+  return hidratado;
+}

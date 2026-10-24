@@ -2,6 +2,7 @@ import Image from 'next/image';
 import { MapPin, Clock, Truck, ShoppingBag, Star } from 'lucide-react';
 import { VerificationBadge } from './VerificationBadge';
 import { StoreStatusBadge } from './StoreStatusBadge';
+import { propsDeImagemRemota } from '@/lib/imagemRemota';
 
 interface StoreData {
   id: string;
@@ -36,6 +37,7 @@ export function StoreHeader({ store }: { store: StoreData }) {
         {store.bannerUrl ? (
           <Image
             src={store.bannerUrl}
+            {...propsDeImagemRemota(store.bannerUrl)}
             alt={`Banner de ${store.name}`}
             fill
             /* KAN-249: banner ocupa a largura toda, entao 100vw e correto —
@@ -61,6 +63,7 @@ export function StoreHeader({ store }: { store: StoreData }) {
             {store.logoUrl ? (
               <Image
                 src={store.logoUrl}
+                {...propsDeImagemRemota(store.logoUrl)}
                 alt={store.name}
                 width={96}
                 height={96}

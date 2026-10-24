@@ -11,8 +11,10 @@ import { CartDrawer } from './CartDrawer';
 import { AuthModal } from './AuthModal';
 import { CheckoutFlow } from './CheckoutFlow';
 import { DeepLinkBanner } from './DeepLinkBanner';
-import { useCart } from '@/lib/useCart';
+import { BotaoDaConta } from './BotaoDaConta';
+import { useCart, useCarrinhoSincronizado } from '@/lib/useCart';
 import { GET_STORE_STATUS } from '@/lib/graphql';
+import { estaLogado } from '@/lib/sessao';
 
 interface StorefrontData {
   id: string;
@@ -68,16 +70,29 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [conflict, setConflict] = useState<ConflictState | null>(null);
 
-  const { itemCount, items } = useCart();
+  // KAN-282 (itens 12 e 15): hidrata o carrinho persistido FORA do render (fim
+  // do mismatch de hidratacao) e passa a ouvir as outras abas.
+  const carrinhoPronto = useCarrinhoSincronizado();
+  const { itemCount, items, storeId: cartStoreId, storeName: cartStoreName } = useCart();
   const count = itemCount();
+
+  // O carrinho é global e pertence a UMA loja. Aberto dentro de OUTRA loja, o
+  // checkout usava frete, pedido mínimo e "loja aberta" da página — não dos
+  // itens — e só no fim dizia "abra a loja correta", com o botão ainda ativo.
+  // Agora "Finalizar" leva para a loja dos itens e abre o checkout lá.
+  const carrinhoDeOutraLoja = items.length > 0 && !!cartStoreId && cartStoreId !== initialData.id;
 
   // 8.11: reconcilia o carrinho persistido com o catalogo FRESCO do SSR — preco
   // que mudou desde a ultima visita, item que sumiu/esgotou. Sem isto o cliente
   // confirmava um total que o servidor ja nao cobrava.
+  // Depende de `carrinhoPronto`: antes da hidratacao o carrinho em memoria esta
+  // vazio e a reconciliacao nao teria nada para reconciliar — rodava a vazio e
+  // o preco velho sobrevivia. Agora roda quando o estado real ja esta carregado.
   useEffect(() => {
+    if (!carrinhoPronto) return;
     const prods = (initialData.categories || []).flatMap((c) => c.products || []);
     useCart.getState().syncWithCatalog(initialData.id, prods);
-  }, [initialData]);
+  }, [initialData, carrinhoPronto]);
 
   // KAN-282: `initialData.isOpen` e um snapshot do SSR. Sem revalidacao, quem
   // deixava a aba aberta via "Aberto" para sempre, montava o carrinho, criava
@@ -107,17 +122,37 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
 
   const handleCheckout = () => {
     // KAN-257: decidia "esta logado?" pelo `user` do localStorage, mas quem
-    // autentica a mutation e o `token`. Com `user` presente e token expirado/
+    // autentica a mutation e a SESSAO. Com `user` presente e sessao expirada/
     // ausente, o cliente ia ate o fim do checkout e so descobria o problema no
-    // confirmar (erro tardio, na pior hora). Agora exige o token.
-    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    // confirmar (erro tardio, na pior hora).
+    //
+    // KAN-248: a sessao deixou de ser um token no localStorage e virou cookie
+    // httpOnly; `estaLogado()` le o cookie-companheiro legivel, que nasce e
+    // morre junto com ele (ver lib/sessao.ts).
     setCartOpen(false);
-    if (!token) {
+    if (carrinhoDeOutraLoja) {
+      window.location.assign(`/loja/${cartStoreId}?finalizar=1`);
+      return;
+    }
+    if (!estaLogado()) {
       setAuthOpen(true);
     } else {
       setCheckoutOpen(true);
     }
   };
+
+  // Chegou aqui vindo de "Finalizar no <loja>" de outra página: abre o
+  // checkout assim que o carrinho hidratar, e limpa o ?finalizar da URL.
+  useEffect(() => {
+    if (!carrinhoPronto) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('finalizar') !== '1') return;
+    params.delete('finalizar');
+    const resto = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (resto ? `?${resto}` : ''));
+    if (items.length > 0 && cartStoreId === initialData.id) handleCheckout();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carrinhoPronto]);
 
   const handleAuthSuccess = () => {
     setAuthOpen(false);
@@ -162,6 +197,17 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       <DeepLinkBanner storeId={initialData.slug ?? initialData.id} />
 
       <div className="min-h-screen bg-[var(--bg-page)]">
+        {/* Barra do topo: volta para as lojas e acesso à conta, sempre. */}
+        <div className="bg-[var(--bg-card)] border-b border-[var(--border-color)]">
+          <div className="max-w-5xl mx-auto px-4 py-2 flex items-center gap-3">
+            <a href="/" className="text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]">
+              ← Lojas
+            </a>
+            <div className="ml-auto">
+              <BotaoDaConta />
+            </div>
+          </div>
+        </div>
         <StoreHeader store={initialData} />
         <CategoryNav categories={activeCategories} />
         <ProductGrid
@@ -174,9 +220,11 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
       </div>
 
       {/* FAB carrinho — visivel enquanto HOUVER itens (mesmo so indisponiveis:
-          o cliente precisa conseguir abrir o carrinho para remove-los) */}
+          o cliente precisa conseguir abrir o carrinho para remove-los).
+          `carrinhoPronto` evita renderizar o FAB antes da hidratacao: o HTML do
+          servidor nunca o tem, e divergir aqui era a origem do item 12. */}
       <AnimatePresence>
-        {items.length > 0 && (
+        {carrinhoPronto && items.length > 0 && (
           <motion.button
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -196,7 +244,10 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         open={cartOpen}
         onClose={() => setCartOpen(false)}
         onCheckout={handleCheckout}
-        storeOpen={lojaAberta}
+        // Carrinho de outra loja: "aberta ou fechada" é da loja dos itens, e
+        // isso se confere lá; a desta página não decide nada.
+        storeOpen={carrinhoDeOutraLoja ? true : lojaAberta}
+        finalizarEm={carrinhoDeOutraLoja ? cartStoreName || 'loja do carrinho' : null}
       />
       <AuthModal
         open={authOpen}
