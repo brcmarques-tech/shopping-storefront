@@ -11,6 +11,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useCart, itemTotal, formatWeight } from '@/lib/useCart';
 import { CREATE_ORDER, GET_MINIMUM_ORDER_PLATFORM, MY_ADDRESSES } from '@/lib/graphql';
 import { estaLogado } from '@/lib/sessao';
+import { gql } from '@apollo/client';
+import {
+  EscolhaDoCartao, CARTAO_VAZIO, problemaNoCartao, tokenizarCartao, type EscolhaCartao,
+} from '@/components/EscolhaDoCartao';
+
+const CHAVE_PUBLICA = gql`
+  query ChavePublicaDoPagamento {
+    chavePublicaDoPagamento
+  }
+`;
 
 /** Mesmo texto de endereço que o app grava no pedido. */
 function textoDoEndereco(a: any): string {
@@ -44,7 +54,7 @@ const METODOS: {
   {
     valor: 'CREDIT_CARD',
     titulo: 'Cartão de crédito',
-    ajuda: 'Você é levado para a página segura do provedor de pagamento.',
+    ajuda: 'Digite o cartão aqui. O valor fica reservado e só é cobrado quando o pedido for concluído.',
     Icone: CreditCard,
   },
   {
@@ -104,6 +114,8 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   // é a URL do checkout do provedor.
   const [pix, setPix] = useState<{ codigo?: string; imagem?: string } | null>(null);
   const [cartaoUrl, setCartaoUrl] = useState<string | null>(null);
+  // KAN-325: cartão digitado aqui (tokenizado no Pagar.me) ou um cartão salvo.
+  const [cartao, setCartao] = useState<EscolhaCartao>({ modo: 'novo', dados: CARTAO_VAZIO });
   const [copiado, setCopiado] = useState(false);
   const [serverTotal, setServerTotal] = useState<number | null>(null);
   const [totalDivergiu, setTotalDivergiu] = useState(false);
@@ -128,6 +140,18 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
     fetchPolicy: 'cache-and-network',
   });
   const enderecos: any[] = dadosEnderecos?.myAddresses || [];
+  const { data: dadosChave } = useQuery(CHAVE_PUBLICA, { skip: !open || paymentMethod !== 'CREDIT_CARD' });
+
+  /** Campos de cartão para o createOrder: cartão salvo ou token do cartão novo. */
+  const dadosDoCartao = async (): Promise<{ cardId?: string; cardToken?: string }> => {
+    if (paymentMethod !== 'CREDIT_CARD') return {};
+    if (cartao.modo === 'salvo') return { cardId: cartao.id };
+    const problema = problemaNoCartao(cartao.dados);
+    if (problema) throw new Error(problema);
+    const chave = dadosChave?.chavePublicaDoPagamento;
+    if (!chave) throw new Error('Pagamento com cartão indisponível agora. Escolha PIX ou pague na entrega.');
+    return { cardToken: await tokenizarCartao(chave, cartao.dados) };
+  };
   const minimoPlataforma = Number(minPlatData?.minimumOrderPlatform) || 0;
   const minimoEfetivo =
     hasOwnDelivery === false ? Math.max(minimoPlataforma, minimumOrder) : minimumOrder;
@@ -185,10 +209,12 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
       return;
     }
     try {
+      const cartaoDoPedido = await dadosDoCartao();
       const { data } = await createOrder({
         variables: {
           input: {
             storeId,
+            ...cartaoDoPedido,
             items: items.map((i) => ({
               productId: i.productId,
               quantity: i.quantity,
@@ -278,6 +304,7 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
     setStep('address');
     setAddress('');
     setEnderecoSalvo(null);
+    setCartao({ modo: 'novo', dados: CARTAO_VAZIO });
     setNotes('');
     setOrderNumber(null);
     setPix(null);
@@ -314,7 +341,7 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
               <div className="flex flex-col items-center justify-center py-12 px-6 text-center gap-4">
                 <CheckCircle size={56} className="text-green-500" />
                 <h2 className="text-xl font-bold text-[var(--text-primary)]">
-                  {paymentMethod === 'ON_DELIVERY'
+                  {paymentMethod !== 'PIX'
                     ? 'Pedido realizado!'
                     : 'Pedido criado — falta pagar'}
                 </h2>
@@ -329,7 +356,9 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                       recebe o pedido quando o pagamento e confirmado, e o
                       scheduler expira em 30 min (mesma validade do QR do PIX).
                       Dizer "aguarde o contato da loja" aqui seria mentira. */}
-                  {paymentMethod !== 'ON_DELIVERY'
+                  {paymentMethod === 'CREDIT_CARD'
+                    ? 'O valor ficou reservado no seu cartão e só é cobrado quando o pedido for concluído.'
+                    : paymentMethod === 'PIX'
                     ? 'A loja recebe o pedido assim que o pagamento for confirmado. Você tem 30 minutos para pagar.'
                     : somenteRetirada && storeAddress
                       ? <>Retire seu pedido em: <strong>{storeAddress}</strong></>
@@ -418,8 +447,7 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                       </>
                     ) : (
                       <p className="text-xs text-[var(--text-secondary)]">
-                        A página de pagamento não veio na resposta. Abra o pedido{' '}
-                        <strong>#{orderNumber}</strong> no aplicativo para pagar.
+                        Cartão aprovado. Acompanhe o pedido em Minha conta.
                       </p>
                     )}
                   </div>
@@ -599,6 +627,9 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                           </button>
                         ))}
                       </div>
+                      {paymentMethod === 'CREDIT_CARD' && (
+                        <EscolhaDoCartao valor={cartao} onChange={(v) => { setCartao(v); setError(''); }} />
+                      )}
                       {paymentMethod !== 'ON_DELIVERY' && (
                         <p className="text-xs text-[var(--text-muted)] bg-[var(--bg-muted)] rounded-xl p-3">
                           Pagamento online exige CPF no cadastro — é requisito do
@@ -613,7 +644,14 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                         className="w-full px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm resize-none"
                       />
                       <button
-                        onClick={() => setStep('confirm')}
+                        onClick={() => {
+                          if (paymentMethod === 'CREDIT_CARD' && cartao.modo === 'novo') {
+                            const problema = problemaNoCartao(cartao.dados);
+                            if (problema) { setError(problema); return; }
+                          }
+                          setError('');
+                          setStep('confirm');
+                        }}
                         className="w-full py-3 bg-[var(--brand-primary)] text-white font-semibold rounded-xl"
                       >
                         Revisar pedido
@@ -677,7 +715,9 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                         {paymentMethod === 'PIX'
                           ? '💠 PIX — QR Code na próxima tela'
                           : paymentMethod === 'CREDIT_CARD'
-                            ? '💳 Cartão de crédito — página segura do provedor'
+                            ? cartao.modo === 'novo'
+                              ? `💳 Cartão final ${cartao.dados.numero.replace(/\D/g, '').slice(-4)}`
+                              : '💳 Cartão salvo'
                             : somenteRetirada
                               ? '🏪 Retirada no local — pague ao retirar'
                               : '💵 Pagamento na entrega'}
