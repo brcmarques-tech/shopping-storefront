@@ -45,10 +45,16 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
   const [pesoGramas, setPesoGramas] = useState(500);
 
   const cartItem = items.find((i) => i.productId === product.id);
-  const displayPrice = product.promotionalPrice ?? product.price;
+  // Mesma regra do servidor: promocional vazio ou zerado vale o preço normal;
+  // só mostra "promoção" quando o promocional é de fato menor.
+  const displayPrice = product.promotionalPrice || product.price;
+  const temPromo = !!product.promotionalPrice && product.promotionalPrice < product.price;
+  const [noMaximo, setNoMaximo] = useState(false);
 
   const handleAdd = () => {
     if (product.isVariableWeight && !pesoAberto) {
+      // Já no carrinho: o seletor abre no peso atual para ajustar.
+      if (cartItem?.weightGrams) setPesoGramas(cartItem.weightGrams);
       setPesoAberto(true);
       return;
     }
@@ -70,6 +76,11 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
     });
     if (result === 'conflict') {
       onConflict(product);
+      return;
+    }
+    if (result === 'max') {
+      setNoMaximo(true);
+      setTimeout(() => setNoMaximo(false), 2000);
       return;
     }
     setPesoAberto(false);
@@ -102,7 +113,7 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
             🛍️
           </div>
         )}
-        {product.promotionalPrice && (
+        {temPromo && (
           <span className="absolute top-2 left-2 bg-[var(--brand-primary)] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
             PROMO
           </span>
@@ -131,7 +142,7 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
                 </span>
               )}
             </p>
-            {product.promotionalPrice && (
+            {temPromo && (
               <p className="text-xs text-[var(--text-muted)] line-through">
                 {formatCurrency(product.price)}
               </p>
@@ -159,6 +170,12 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
             </button>
           )}
         </div>
+
+        {noMaximo && (
+          <p className="mt-1 text-[11px] font-medium text-[var(--text-muted)]">
+            Você já tem todo o estoque no carrinho.
+          </p>
+        )}
 
         {/* Seletor de peso (produto de peso variavel) */}
         {pesoAberto && product.isAvailable && storeOpen && (

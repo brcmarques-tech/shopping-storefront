@@ -262,6 +262,9 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
     setServerTotal(null);
     setTotalDivergiu(false);
     setError('');
+    // O próximo pedido começa do padrão: +18 desmarcado e PIX.
+    setAgeConfirmed(false);
+    setPaymentMethod('PIX');
     onClose();
   };
 
@@ -430,7 +433,14 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                     {step === 'payment' && 'Pagamento'}
                     {step === 'confirm' && 'Confirmar pedido'}
                   </h2>
-                  <button onClick={onClose}>
+                  <button
+                    aria-label="Fechar"
+                    onClick={() => {
+                      // Reabrir não pode mostrar o erro da tentativa anterior.
+                      setError('');
+                      onClose();
+                    }}
+                  >
                     <X size={20} className="text-[var(--text-muted)]" />
                   </button>
                 </div>

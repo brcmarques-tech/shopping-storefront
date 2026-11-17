@@ -28,13 +28,15 @@ interface StoreCard {
   totalRatings: number;
 }
 
-async function fetchStores(): Promise<StoreCard[]> {
+/** null = não deu para falar com a API (diferente de "nenhuma loja"). */
+async function fetchStores(): Promise<StoreCard[] | null> {
   try {
     const client = createServerApolloClient();
     const { data } = await client.query({ query: GET_PUBLIC_STORES });
     return data.publicStores ?? [];
-  } catch {
-    return [];
+  } catch (e) {
+    console.error('[storefront] erro ao listar lojas:', e);
+    return null;
   }
 }
 
@@ -50,7 +52,9 @@ export const metadata = {
 };
 
 export default async function HomePage() {
-  const stores = await fetchStores();
+  const resposta = await fetchStores();
+  const falhou = resposta === null;
+  const stores = resposta ?? [];
   const open = stores.filter((s) => s.isOpen);
   const closed = stores.filter((s) => !s.isOpen);
   const sorted = [...open, ...closed];
@@ -80,7 +84,18 @@ export default async function HomePage() {
           {open.length !== 1 ? "s" : ""} agora
         </p>
 
-        {sorted.length === 0 ? (
+        {falhou ? (
+          // Antes a API fora do ar aparecia como "nenhuma loja".
+          <div className="text-center py-20 text-[var(--text-secondary)]">
+            <p>Não conseguimos carregar as lojas agora.</p>
+            <a
+              href="/"
+              className="inline-block mt-4 px-5 py-2.5 rounded-xl bg-[var(--brand-primary)] text-white font-semibold hover:opacity-90"
+            >
+              Tentar de novo
+            </a>
+          </div>
+        ) : sorted.length === 0 ? (
           <div className="text-center py-20 text-[var(--text-secondary)]">
             Nenhuma loja disponível no momento.
           </div>

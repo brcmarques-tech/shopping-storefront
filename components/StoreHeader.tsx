@@ -29,7 +29,8 @@ function formatCurrency(value: number) {
   }).format(value);
 }
 
-export function StoreHeader({ store }: { store: StoreData }) {
+/** `aberta`: status reconferido a cada 60 s; sem ele, vale o do carregamento da página. */
+export function StoreHeader({ store, aberta }: { store: StoreData; aberta?: boolean }) {
   return (
     <div>
       {/* Banner */}
@@ -81,7 +82,7 @@ export function StoreHeader({ store }: { store: StoreData }) {
               {store.name}
             </h1>
             <div className="flex flex-wrap items-center gap-2 mt-1">
-              <StoreStatusBadge isOpen={store.isOpen} />
+              <StoreStatusBadge isOpen={aberta ?? store.isOpen} />
               <VerificationBadge level={store.verificationLevel} />
             </div>
           </div>

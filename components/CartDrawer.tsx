@@ -1,6 +1,9 @@
 'use client';
 
+import { useState } from 'react';
+import { useQuery } from '@apollo/client';
 import { X, Minus, Plus, Trash2, ShoppingCart } from 'lucide-react';
+import { GET_MINIMUM_ORDER_PLATFORM } from '@/lib/graphql';
 import { useCart, itemTotal, formatWeight } from '@/lib/useCart';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -18,9 +21,22 @@ interface Props {
   storeOpen: boolean;
   /** Carrinho de outra loja: o botão leva para ela ("Finalizar no X"). */
   finalizarEm?: string | null;
+  /** Pedido mínimo da loja (não vale para carrinho de outra loja). */
+  minimumOrder?: number;
+  hasOwnDelivery?: boolean;
 }
 
-export function CartDrawer({ open, onClose, onCheckout, storeOpen, finalizarEm }: Props) {
+export function CartDrawer({ open, onClose, onCheckout, storeOpen, finalizarEm, minimumOrder = 0, hasOwnDelivery }: Props) {
+  const [confirmarEsvaziar, setConfirmarEsvaziar] = useState(false);
+  // Mesma regra do checkout e do servidor: sem frota própria vale o MAIOR entre
+  // o mínimo da plataforma e o da loja. Antes o cliente só descobria no último passo.
+  const { data: minPlatData } = useQuery(GET_MINIMUM_ORDER_PLATFORM, { skip: !open || !!finalizarEm });
+  const minimoPlataforma = Number(minPlatData?.minimumOrderPlatform) || 0;
+  const minimoEfetivo = finalizarEm
+    ? 0
+    : hasOwnDelivery === false
+      ? Math.max(minimoPlataforma, minimumOrder)
+      : minimumOrder;
   const {
     items,
     updateQuantity,
@@ -35,6 +51,7 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen, finalizarEm }
   // 8.11: item que sumiu/esgotou desde a ultima visita bloqueia o checkout ate
   // ser removido (remover em silencio esconderia o problema do cliente).
   const temIndisponivel = items.some((i) => i.unavailable);
+  const abaixoDoMinimo = minimoEfetivo > 0 && subtotal() < minimoEfetivo;
 
   return (
     <AnimatePresence>
@@ -68,14 +85,34 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen, finalizarEm }
                 )}
               </div>
               <div className="flex items-center gap-2">
-                {items.length > 0 && (
-                  <button
-                    onClick={clearCart}
-                    className="text-xs text-[var(--status-error-text)] hover:underline"
-                  >
-                    Limpar
-                  </button>
-                )}
+                {items.length > 0 &&
+                  (confirmarEsvaziar ? (
+                    <span className="flex items-center gap-2 text-xs">
+                      <span className="text-[var(--text-secondary)]">Esvaziar o carrinho?</span>
+                      <button
+                        onClick={() => {
+                          clearCart();
+                          setConfirmarEsvaziar(false);
+                        }}
+                        className="font-semibold text-[var(--status-error-text)] hover:underline"
+                      >
+                        Sim
+                      </button>
+                      <button
+                        onClick={() => setConfirmarEsvaziar(false)}
+                        className="text-[var(--text-secondary)] hover:underline"
+                      >
+                        Não
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmarEsvaziar(true)}
+                      className="text-xs text-[var(--status-error-text)] hover:underline"
+                    >
+                      Esvaziar
+                    </button>
+                  ))}
                 <button
                   onClick={onClose}
                   className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--bg-hover)]"
@@ -233,9 +270,15 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen, finalizarEm }
                     Remova os itens indisponíveis para finalizar o pedido.
                   </p>
                 )}
+                {abaixoDoMinimo && (
+                  <p className="text-xs text-center text-amber-700 dark:text-amber-400">
+                    Faltam {formatCurrency(minimoEfetivo - subtotal())} para o pedido mínimo (
+                    {formatCurrency(minimoEfetivo)}).
+                  </p>
+                )}
                 <button
                   onClick={onCheckout}
-                  disabled={!storeOpen || temIndisponivel}
+                  disabled={!storeOpen || temIndisponivel || abaixoDoMinimo}
                   className="w-full py-3 bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)] text-white font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {finalizarEm ? `Finalizar no ${finalizarEm}` : 'Finalizar pedido'}

@@ -208,7 +208,7 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
             </div>
           </div>
         </div>
-        <StoreHeader store={initialData} />
+        <StoreHeader store={initialData} aberta={lojaAberta} />
         <CategoryNav categories={activeCategories} />
         <ProductGrid
           categories={initialData.categories}
@@ -248,6 +248,8 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
         // isso se confere lá; a desta página não decide nada.
         storeOpen={carrinhoDeOutraLoja ? true : lojaAberta}
         finalizarEm={carrinhoDeOutraLoja ? cartStoreName || 'loja do carrinho' : null}
+        minimumOrder={initialData.minimumOrder}
+        hasOwnDelivery={initialData.hasOwnDelivery}
       />
       <AuthModal
         open={authOpen}

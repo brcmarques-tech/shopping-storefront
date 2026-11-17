@@ -47,7 +47,9 @@ export interface CatalogProduct {
  */
 export function itemTotal(i: CartItem): number {
   if (i.unavailable) return 0;
-  const preco = i.promotionalPrice ?? i.price;
+  // Mesma regra do servidor (orders.service.ts: promotionalPrice || price):
+  // promocional zerado ou vazio vale o preço normal.
+  const preco = i.promotionalPrice || i.price;
   if (i.isVariableWeight && i.weightGrams) {
     return Math.round((preco * i.weightGrams) / 10) / 100;
   }
@@ -77,7 +79,8 @@ interface CartStore {
    * Nao e persistido (ver partialize).
    */
   hidratado: boolean;
-  addItem: (storeId: string, storeName: string, item: CartItem) => 'added' | 'conflict';
+  /** 'max' = já tem no carrinho tudo o que há em estoque (nada foi somado). */
+  addItem: (storeId: string, storeName: string, item: CartItem) => 'added' | 'conflict' | 'max';
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   updateWeight: (productId: string, weightGrams: number) => void;
@@ -120,8 +123,8 @@ export const useCart = create<CartStore>()(
             if (!i.unavailable) mudouPreco = true;
             return { ...i, unavailable: true };
           }
-          const precoAntigo = i.promotionalPrice ?? i.price;
-          const precoNovo = p.promotionalPrice ?? p.price;
+          const precoAntigo = i.promotionalPrice || i.price;
+          const precoNovo = p.promotionalPrice || p.price;
           if (precoNovo !== precoAntigo) mudouPreco = true;
           const quantity =
             !p.isVariableWeight && p.stock != null && i.quantity > p.stock ? p.stock : i.quantity;
@@ -150,11 +153,18 @@ export const useCart = create<CartStore>()(
         }
         const existing = state.items.find((i) => i.productId === item.productId);
         if (existing) {
+          // Peso variável: o seletor do card AJUSTA o peso (abre com o peso que
+          // já está no carrinho); antes o "OK" somava e 500 g + 500 g virava 1 kg.
+          // Unidade: soma +1, mas sem passar do estoque (a gaveta já limitava).
+          if (!item.isVariableWeight) {
+            const estoque = item.stock ?? existing.stock;
+            if (estoque != null && existing.quantity + item.quantity > estoque) return 'max';
+          }
           set({
             items: state.items.map((i) =>
               i.productId === item.productId
                 ? item.isVariableWeight
-                  ? { ...i, weightGrams: (i.weightGrams || 0) + (item.weightGrams || 0) }
+                  ? { ...i, weightGrams: item.weightGrams || i.weightGrams }
                   : { ...i, quantity: i.quantity + item.quantity }
                 : i,
             ),
