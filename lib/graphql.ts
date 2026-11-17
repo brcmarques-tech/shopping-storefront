@@ -93,7 +93,8 @@ export const GET_PUBLIC_STORES = gql`
 
 export const LOGIN_APP = gql`
   mutation LoginApp($input: LoginInput!, $forceLogin: Boolean) {
-    loginApp(input: $input, forceLogin: $forceLogin) {
+    # canal web: sessao propria do site, nao derruba o app
+    loginApp(input: $input, forceLogin: $forceLogin, canal: "web") {
       accessToken
       user {
         id
@@ -107,7 +108,7 @@ export const LOGIN_APP = gql`
 
 export const REGISTER_APP = gql`
   mutation RegisterApp($input: RegisterAppInput!) {
-    registerApp(input: $input) {
+    registerApp(input: $input, canal: "web") {
       accessToken
       user {
         id
