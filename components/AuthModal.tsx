@@ -5,6 +5,7 @@ import { X, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useMutation } from '@apollo/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LOGIN_APP, REGISTER_APP } from '@/lib/graphql';
+import { EsqueciASenha } from '@/components/EsqueciASenha';
 
 // Falha de rede ou de servidor nao e erro do cliente. O caso que escapava: com a
 // API fora, o proxy /api/graphql responde 502 e o Apollo IGNORA o corpo
@@ -178,6 +179,7 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
               )}
 
               {tab === 'login' ? (
+                <>
                 <form onSubmit={handleLogin} className="space-y-3">
                   <input
                     type="email"
@@ -217,6 +219,10 @@ export function AuthModal({ open, onClose, onSuccess }: Props) {
                     Entrar
                   </button>
                 </form>
+                <div className="mt-3">
+                  <EsqueciASenha emailInicial={loginForm.email} />
+                </div>
+                </>
               ) : (
                 <form onSubmit={handleRegister} className="space-y-3">
                   {[

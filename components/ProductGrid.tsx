@@ -25,14 +25,16 @@ interface Props {
   storeName: string;
   storeOpen: boolean;
   onConflict: (product: Product) => void;
+  /** Texto quando não sobra produto (ex.: busca sem resultado). */
+  mensagemVazia?: string;
 }
 
-export function ProductGrid({ categories, storeId, storeName, storeOpen, onConflict }: Props) {
+export function ProductGrid({ categories, storeId, storeName, storeOpen, onConflict, mensagemVazia }: Props) {
   const active = categories.filter((c) => c.products.length > 0);
   if (active.length === 0) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-16 text-center text-[var(--text-muted)]">
-        Nenhum produto disponível no momento.
+        {mensagemVazia || 'Nenhum produto disponível no momento.'}
       </div>
     );
   }

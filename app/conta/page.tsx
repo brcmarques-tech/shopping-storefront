@@ -9,6 +9,9 @@ import { estaLogado, sair } from '@/lib/sessao';
 import { AuthModal } from '@/components/AuthModal';
 import { EVENTO_SESSAO } from '@/components/BotaoDaConta';
 import { ExcluirConta } from '@/components/ExcluirConta';
+import { STATUS_PEDIDO as STATUS, formatarReais } from '@/lib/statusPedido';
+
+const POR_PAGINA = 20;
 
 /**
  * Minha conta: perfil e pedidos.
@@ -17,28 +20,6 @@ import { ExcluirConta } from '@/components/ExcluirConta';
  * tinha onde ver os próprios dados nem acompanhar o pedido feito. Sem sessão,
  * a página convida a entrar em vez de mandar para outro lugar.
  */
-
-const STATUS: Record<string, { texto: string; cor: string }> = {
-  AWAITING_PAYMENT: { texto: 'Aguardando pagamento', cor: 'bg-amber-100 text-amber-800' },
-  PAYMENT_REVIEW: { texto: 'Pagamento em análise', cor: 'bg-amber-100 text-amber-800' },
-  PENDING: { texto: 'Aguardando a loja', cor: 'bg-blue-100 text-blue-800' },
-  ACCEPTED: { texto: 'Aceito', cor: 'bg-blue-100 text-blue-800' },
-  PREPARING: { texto: 'Preparando', cor: 'bg-blue-100 text-blue-800' },
-  READY: { texto: 'Pronto', cor: 'bg-indigo-100 text-indigo-800' },
-  VENDOR_CONFIRMED_PICKUP: { texto: 'Saindo da loja', cor: 'bg-indigo-100 text-indigo-800' },
-  PICKED_UP: { texto: 'A caminho', cor: 'bg-indigo-100 text-indigo-800' },
-  DELIVERING: { texto: 'A caminho', cor: 'bg-indigo-100 text-indigo-800' },
-  DELIVERER_CONFIRMED_DELIVERY: { texto: 'Entregue', cor: 'bg-green-100 text-green-800' },
-  COMPLETED: { texto: 'Concluído', cor: 'bg-green-100 text-green-800' },
-  CANCELLED: { texto: 'Cancelado', cor: 'bg-red-100 text-red-800' },
-  REJECTED: { texto: 'Recusado pela loja', cor: 'bg-red-100 text-red-800' },
-  EXPIRED: { texto: 'Expirado', cor: 'bg-gray-100 text-gray-700' },
-  DISPUTED: { texto: 'Em análise', cor: 'bg-amber-100 text-amber-800' },
-};
-
-function formatarReais(valor: number | string) {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(valor) || 0);
-}
 
 export default function ContaPage() {
   const [logado, setLogado] = useState<boolean | null>(null);
@@ -55,8 +36,11 @@ export default function ContaPage() {
     skip: !logado,
     fetchPolicy: 'network-only',
   });
-  const { data: pedidos, loading: carregandoPedidos } = useQuery(MY_ORDERS, {
-    variables: { limit: 20 },
+  const [temMais, setTemMais] = useState(true);
+  const [carregandoMais, setCarregandoMais] = useState(false);
+  const { data: pedidos, loading: carregandoPedidos, fetchMore } = useQuery(MY_ORDERS, {
+    variables: { limit: POR_PAGINA, offset: 0 },
+    onCompleted: (d) => setTemMais((d?.myOrders?.length || 0) >= POR_PAGINA),
     skip: !logado,
     fetchPolicy: 'network-only',
   });
@@ -65,6 +49,23 @@ export default function ContaPage() {
     await sair();
     window.dispatchEvent(new Event(EVENTO_SESSAO));
     window.location.assign('/');
+  }
+
+  async function verMais() {
+    setCarregandoMais(true);
+    try {
+      const { data } = await fetchMore({
+        variables: { offset: lista.length, limit: POR_PAGINA },
+        updateQuery: (anterior: any, { fetchMoreResult }: any) => {
+          if (!fetchMoreResult) return anterior;
+          const vistos = new Set(anterior.myOrders.map((o: any) => o.id));
+          return { myOrders: [...anterior.myOrders, ...fetchMoreResult.myOrders.filter((o: any) => !vistos.has(o.id))] };
+        },
+      });
+      setTemMais((data?.myOrders?.length || 0) >= POR_PAGINA);
+    } finally {
+      setCarregandoMais(false);
+    }
   }
 
   const usuario = perfil?.meApp;
@@ -142,7 +143,8 @@ export default function ContaPage() {
                   {lista.map((p) => {
                     const st = STATUS[p.status] || { texto: p.status, cor: 'bg-gray-100 text-gray-700' };
                     return (
-                      <li key={p.id} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] p-4 flex items-center gap-4">
+                      <li key={p.id}>
+                        <a href={`/conta/pedido/${p.id}`} className="bg-[var(--bg-card)] rounded-2xl border border-[var(--border-color)] p-4 flex items-center gap-4 hover:border-[var(--brand-primary)]">
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-[var(--text-primary)] truncate">{p.store?.name}</p>
                           <p className="text-xs text-[var(--text-muted)]">
@@ -151,10 +153,20 @@ export default function ContaPage() {
                         </div>
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${st.cor}`}>{st.texto}</span>
                         <span className="font-bold text-[var(--text-primary)] w-24 text-right">{formatarReais(p.total)}</span>
+                        </a>
                       </li>
                     );
                   })}
                 </ul>
+              )}
+              {lista.length > 0 && temMais && (
+                <button
+                  onClick={verMais}
+                  disabled={carregandoMais}
+                  className="mt-3 w-full py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] text-sm font-semibold text-[var(--text-primary)] hover:border-[var(--brand-primary)] disabled:opacity-60"
+                >
+                  {carregandoMais ? 'Carregando...' : 'Ver mais pedidos'}
+                </button>
               )}
             </section>
 

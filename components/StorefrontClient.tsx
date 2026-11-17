@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@apollo/client';
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Search, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StoreHeader } from './StoreHeader';
 import { CategoryNav } from './CategoryNav';
@@ -192,6 +192,20 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
     (c) => c.products.length > 0,
   );
 
+  // Busca dentro da loja: nome, descrição ou categoria, sem ligar para acento.
+  const [busca, setBusca] = useState('');
+  const semAcento = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const categoriasFiltradas = useMemo(() => {
+    const q = semAcento(busca.trim());
+    if (!q) return initialData.categories;
+    return initialData.categories.map((c) => ({
+      ...c,
+      products: semAcento(c.name).includes(q)
+        ? c.products
+        : c.products.filter((p) => semAcento(`${p.name} ${p.description || ''}`).includes(q)),
+    }));
+  }, [busca, initialData.categories]);
+
   return (
     <>
       <DeepLinkBanner storeId={initialData.slug ?? initialData.id} />
@@ -209,9 +223,29 @@ export function StorefrontClient({ initialData }: { initialData: StorefrontData 
           </div>
         </div>
         <StoreHeader store={initialData} aberta={lojaAberta} />
-        <CategoryNav categories={activeCategories} />
+        {!busca.trim() && <CategoryNav categories={activeCategories} />}
+        <div className="max-w-4xl mx-auto px-4 pt-4">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+            <input
+              type="text"
+              inputMode="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder={`Buscar em ${initialData.name}`}
+              aria-label="Buscar produto nesta loja"
+              className="w-full pl-9 pr-9 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] text-[var(--text-primary)] text-sm"
+            />
+            {busca && (
+              <button onClick={() => setBusca('')} aria-label="Limpar busca" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)]">
+                <X size={16} />
+              </button>
+            )}
+          </div>
+        </div>
         <ProductGrid
-          categories={initialData.categories}
+          mensagemVazia={busca.trim() ? `Nenhum produto encontrado para "${busca.trim()}".` : undefined}
+          categories={categoriasFiltradas}
           storeId={initialData.id}
           storeName={initialData.name}
           storeOpen={lojaAberta}

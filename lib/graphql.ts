@@ -173,6 +173,24 @@ export const GET_MINIMUM_ORDER_PLATFORM = gql`
 
 // Área "Minha conta" (perfil + pedidos). Vão pelo proxy /api/graphql, que
 // injeta a sessão do cookie httpOnly.
+// Endereços salvos do cliente (os mesmos do app) — escolhidos no checkout.
+export const MY_ADDRESSES = gql`
+  query MyAddresses {
+    myAddresses {
+      id
+      street
+      number
+      complement
+      neighborhood
+      city
+      state
+      latitude
+      longitude
+      isDefault
+    }
+  }
+`;
+
 export const ME_APP = gql`
   query MeApp {
     meApp {
@@ -185,8 +203,8 @@ export const ME_APP = gql`
 `;
 
 export const MY_ORDERS = gql`
-  query MyOrders($limit: Int) {
-    myOrders(limit: $limit) {
+  query MyOrders($limit: Int, $offset: Int) {
+    myOrders(limit: $limit, offset: $offset) {
       id
       orderNumber
       status

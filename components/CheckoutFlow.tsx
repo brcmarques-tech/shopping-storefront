@@ -9,7 +9,20 @@ import { useMutation, useQuery } from '@apollo/client';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart, itemTotal, formatWeight } from '@/lib/useCart';
-import { CREATE_ORDER, GET_MINIMUM_ORDER_PLATFORM } from '@/lib/graphql';
+import { CREATE_ORDER, GET_MINIMUM_ORDER_PLATFORM, MY_ADDRESSES } from '@/lib/graphql';
+import { estaLogado } from '@/lib/sessao';
+
+/** Mesmo texto de endereço que o app grava no pedido. */
+function textoDoEndereco(a: any): string {
+  return [
+    [a.street, a.number].filter(Boolean).join(', '),
+    a.complement,
+    a.neighborhood,
+    [a.city, a.state].filter(Boolean).join(' - '),
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
 
 type Step = 'address' | 'payment' | 'confirm' | 'success';
 
@@ -79,6 +92,8 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [step, setStep] = useState<Step>('address');
   const [address, setAddress] = useState('');
+  // Endereço salvo escolhido: leva as coordenadas junto (o entregador usa no mapa).
+  const [enderecoSalvo, setEnderecoSalvo] = useState<{ id: string; lat: number; lng: number } | null>(null);
   const [notes, setNotes] = useState('');
   const [orderNumber, setOrderNumber] = useState<string | null>(null);
   // 8.11: o total que VALE e o do servidor (precos atuais) — a resposta do
@@ -108,6 +123,11 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   // "Retirada no local" E somava a taxa de entrega ao mesmo tempo. O cliente
   // confirmava um total maior do que o pedido realmente criado.
   const { data: minPlatData } = useQuery(GET_MINIMUM_ORDER_PLATFORM);
+  const { data: dadosEnderecos } = useQuery(MY_ADDRESSES, {
+    skip: !open || hasOwnDelivery === false || !estaLogado(),
+    fetchPolicy: 'cache-and-network',
+  });
+  const enderecos: any[] = dadosEnderecos?.myAddresses || [];
   const minimoPlataforma = Number(minPlatData?.minimumOrderPlatform) || 0;
   const minimoEfetivo =
     hasOwnDelivery === false ? Math.max(minimoPlataforma, minimumOrder) : minimumOrder;
@@ -182,6 +202,9 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
             // 8.13: retirada nao tem endereco de entrega — o servidor grava o
             // endereco DA LOJA no pedido quando isPickup e true.
             deliveryAddress: somenteRetirada ? undefined : address,
+            ...(!somenteRetirada && enderecoSalvo
+              ? { deliveryLatitude: enderecoSalvo.lat, deliveryLongitude: enderecoSalvo.lng }
+              : {}),
             paymentMethod,
             isPickup: somenteRetirada,
             ageVerified: hasAgeRestrictedItem ? ageConfirmed : undefined,
@@ -254,6 +277,7 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
   const reset = () => {
     setStep('address');
     setAddress('');
+    setEnderecoSalvo(null);
     setNotes('');
     setOrderNumber(null);
     setPix(null);
@@ -468,16 +492,50 @@ export function CheckoutFlow({ open, onClose, storeId, deliveryFee, minimumOrder
                           </div>
                         </div>
                       ) : (
+                        <>
+                        {enderecos.length > 0 && (
+                          <div className="space-y-2">
+                            <p className="text-xs font-semibold text-[var(--text-secondary)]">Seus endereços</p>
+                            {enderecos.map((a) => {
+                              const escolhido = enderecoSalvo?.id === a.id;
+                              return (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setAddress(textoDoEndereco(a));
+                                    setEnderecoSalvo({ id: a.id, lat: Number(a.latitude), lng: Number(a.longitude) });
+                                    setError('');
+                                  }}
+                                  aria-pressed={escolhido}
+                                  className={`w-full text-left rounded-xl border p-3 text-sm transition-colors ${
+                                    escolhido
+                                      ? 'border-[var(--brand-primary)] bg-[var(--brand-primary)]/5'
+                                      : 'border-[var(--border-color)] hover:border-[var(--brand-primary)]'
+                                  }`}
+                                >
+                                  <span className="font-semibold text-[var(--text-primary)]">
+                                    {a.isDefault ? 'Endereço principal' : 'Endereço salvo'}
+                                  </span>
+                                  <span className="block text-[var(--text-secondary)]">{textoDoEndereco(a)}</span>
+                                </button>
+                              );
+                            })}
+                            <p className="text-xs text-[var(--text-muted)] pt-1">Ou escreva outro endereço:</p>
+                          </div>
+                        )}
                         <div className="flex items-start gap-3 bg-[var(--bg-muted)] rounded-xl p-3">
                           <MapPin size={18} className="text-[var(--brand-primary)] mt-0.5 shrink-0" />
                           <textarea
                             value={address}
-                            onChange={(e) => setAddress(e.target.value)}
+                            aria-label="Endereço de entrega"
+                            onChange={(e) => { setAddress(e.target.value); setEnderecoSalvo(null); }}
                             placeholder="Rua, número, bairro, complemento..."
                             rows={3}
                             className="flex-1 bg-transparent text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] resize-none"
                           />
                         </div>
+                        </>
                       )}
                       <button
                         onClick={() => {

@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { Plus, Minus } from 'lucide-react';
+import { Plus, Minus, X } from 'lucide-react';
+import { ObservacaoDoItem } from '@/components/ObservacaoDoItem';
 import { useCart, formatWeight } from '@/lib/useCart';
 import { useState } from 'react';
 import { propsDeImagemRemota } from '@/lib/imagemRemota';
@@ -50,6 +51,8 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
   const displayPrice = product.promotionalPrice || product.price;
   const temPromo = !!product.promotionalPrice && product.promotionalPrice < product.price;
   const [noMaximo, setNoMaximo] = useState(false);
+  // Detalhe do produto: foto grande, descrição inteira e observação do item.
+  const [detalhe, setDetalhe] = useState(false);
 
   const handleAdd = () => {
     if (product.isVariableWeight && !pesoAberto) {
@@ -88,14 +91,51 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
     setTimeout(() => setAdded(false), 1200);
   };
 
+  const seletorDePeso = (
+          <div className="mt-2 flex items-center justify-between gap-2 bg-[var(--bg-muted)] rounded-xl p-2">
+            <button
+              onClick={() => pesoGramas > 50 && setPesoGramas(pesoGramas - 50)}
+              disabled={pesoGramas <= 50}
+              className="w-7 h-7 rounded-full bg-[var(--bg-card)] flex items-center justify-center disabled:opacity-40"
+            >
+              <Minus size={14} className="text-[var(--text-secondary)]" />
+            </button>
+            <div className="text-center leading-tight">
+              <p className="text-sm font-bold text-[var(--text-primary)]">
+                {formatWeight(pesoGramas)}
+              </p>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                {formatCurrency(Math.round((displayPrice * pesoGramas) / 10) / 100)}
+              </p>
+            </div>
+            <button
+              onClick={() => setPesoGramas(pesoGramas + 50)}
+              className="w-7 h-7 rounded-full bg-[var(--bg-card)] flex items-center justify-center"
+            >
+              <Plus size={14} className="text-[var(--text-secondary)]" />
+            </button>
+            <button
+              onClick={handleAdd}
+              className="px-3 py-1.5 bg-[var(--brand-primary)] text-white rounded-lg text-xs font-semibold"
+            >
+              OK
+            </button>
+          </div>
+  );
+
   return (
     <div
       className={`bg-[var(--bg-card)] rounded-2xl overflow-hidden shadow-[var(--card-shadow)] transition-shadow hover:shadow-[var(--card-shadow-hover)] flex flex-col ${
         !product.isAvailable ? 'opacity-50' : ''
       }`}
     >
-      {/* Imagem */}
-      <div className="relative h-36 bg-[var(--bg-muted)] overflow-hidden">
+      {/* Imagem (abre o detalhe) */}
+      <button
+        type="button"
+        onClick={() => setDetalhe(true)}
+        aria-label={`Ver detalhes de ${product.name}`}
+        className="relative h-36 bg-[var(--bg-muted)] overflow-hidden block w-full text-left"
+      >
         {product.imageUrl ? (
           <Image
             src={product.imageUrl}
@@ -118,13 +158,15 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
             PROMO
           </span>
         )}
-      </div>
+      </button>
 
       {/* Info */}
       <div className="p-3 flex flex-col flex-1 gap-1">
-        <p className="text-sm font-semibold text-[var(--text-primary)] line-clamp-2 leading-snug">
-          {product.name}
-        </p>
+        <button type="button" onClick={() => setDetalhe(true)} className="text-left">
+          <p className="text-sm font-semibold text-[var(--text-primary)] line-clamp-2 leading-snug hover:text-[var(--brand-primary)]">
+            {product.name}
+          </p>
+        </button>
         {product.description && (
           <p className="text-xs text-[var(--text-muted)] line-clamp-2">
             {product.description}
@@ -178,38 +220,79 @@ export function ProductCard({ product, storeId, storeName, storeOpen, onConflict
         )}
 
         {/* Seletor de peso (produto de peso variavel) */}
-        {pesoAberto && product.isAvailable && storeOpen && (
-          <div className="mt-2 flex items-center justify-between gap-2 bg-[var(--bg-muted)] rounded-xl p-2">
-            <button
-              onClick={() => pesoGramas > 50 && setPesoGramas(pesoGramas - 50)}
-              disabled={pesoGramas <= 50}
-              className="w-7 h-7 rounded-full bg-[var(--bg-card)] flex items-center justify-center disabled:opacity-40"
-            >
-              <Minus size={14} className="text-[var(--text-secondary)]" />
-            </button>
-            <div className="text-center leading-tight">
-              <p className="text-sm font-bold text-[var(--text-primary)]">
-                {formatWeight(pesoGramas)}
-              </p>
-              <p className="text-[10px] text-[var(--text-muted)]">
-                {formatCurrency(Math.round((displayPrice * pesoGramas) / 10) / 100)}
-              </p>
-            </div>
-            <button
-              onClick={() => setPesoGramas(pesoGramas + 50)}
-              className="w-7 h-7 rounded-full bg-[var(--bg-card)] flex items-center justify-center"
-            >
-              <Plus size={14} className="text-[var(--text-secondary)]" />
-            </button>
-            <button
-              onClick={handleAdd}
-              className="px-3 py-1.5 bg-[var(--brand-primary)] text-white rounded-lg text-xs font-semibold"
-            >
-              OK
-            </button>
-          </div>
-        )}
+        {pesoAberto && product.isAvailable && storeOpen && !detalhe && seletorDePeso}
       </div>
+
+      {detalhe && (
+        <div className="fixed inset-0 z-[var(--z-modal)] flex items-end sm:items-center justify-center bg-black/50" onClick={() => setDetalhe(false)}>
+          <div
+            role="dialog"
+            aria-label={product.name}
+            className="w-full sm:max-w-md bg-[var(--bg-card)] rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative h-56 bg-[var(--bg-muted)]">
+              {product.imageUrl ? (
+                <Image src={product.imageUrl} {...propsDeImagemRemota(product.imageUrl)} alt={product.name} fill sizes="(max-width: 640px) 100vw, 448px" className="object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-5xl select-none">🛍️</div>
+              )}
+              <button
+                onClick={() => setDetalhe(false)}
+                aria-label="Fechar"
+                className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/50 text-white flex items-center justify-center"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <h3 className="text-lg font-bold text-[var(--text-primary)]">{product.name}</h3>
+              {product.description && (
+                <p className="text-sm text-[var(--text-secondary)] whitespace-pre-line">{product.description}</p>
+              )}
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold text-[var(--text-primary)]">
+                  {formatCurrency(displayPrice)}
+                  {product.isVariableWeight && <span className="text-sm font-normal text-[var(--text-muted)]">/{product.unit || 'kg'}</span>}
+                </span>
+                {temPromo && <span className="text-sm text-[var(--text-muted)] line-through">{formatCurrency(product.price)}</span>}
+              </div>
+
+              {!product.isAvailable ? (
+                <p className="text-sm font-medium text-[var(--status-error-text)]">Indisponível no momento.</p>
+              ) : !storeOpen ? (
+                <p className="text-sm font-medium text-[var(--text-muted)]">A loja está fechada agora.</p>
+              ) : (
+                <>
+                  {cartItem && (
+                    <div className="rounded-xl bg-[var(--bg-muted)] px-3 py-2">
+                      <p className="text-sm text-[var(--text-primary)]">
+                        No carrinho: <strong>{cartItem.isVariableWeight && cartItem.weightGrams ? formatWeight(cartItem.weightGrams) : `${cartItem.quantity} un.`}</strong>
+                      </p>
+                      <ObservacaoDoItem productId={product.id} notes={cartItem.notes} />
+                    </div>
+                  )}
+                  {pesoAberto && seletorDePeso}
+                  {!pesoAberto && (
+                    <button
+                      onClick={handleAdd}
+                      className={`w-full py-3 rounded-xl font-semibold text-white ${added ? 'bg-green-500' : 'bg-[var(--brand-primary)] hover:bg-[var(--brand-primary-hover)]'}`}
+                    >
+                      {added
+                        ? 'Adicionado!'
+                        : product.isVariableWeight
+                          ? cartItem ? 'Mudar o peso' : 'Escolher o peso'
+                          : cartItem ? 'Adicionar mais um' : 'Adicionar ao carrinho'}
+                    </button>
+                  )}
+                  {noMaximo && <p className="text-xs text-[var(--text-muted)]">Você já tem todo o estoque no carrinho.</p>}
+                  {!cartItem && <p className="text-xs text-[var(--text-muted)]">Depois de adicionar, dá para escrever uma observação (ex.: sem cebola).</p>}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

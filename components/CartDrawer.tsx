@@ -6,6 +6,7 @@ import { X, Minus, Plus, Trash2, ShoppingCart } from 'lucide-react';
 import { GET_MINIMUM_ORDER_PLATFORM } from '@/lib/graphql';
 import { useCart, itemTotal, formatWeight } from '@/lib/useCart';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ObservacaoDoItem } from '@/components/ObservacaoDoItem';
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
@@ -174,6 +175,7 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen, finalizarEm, 
                         )}
                       </p>
                       )}
+                      {!item.unavailable && <ObservacaoDoItem productId={item.productId} notes={item.notes} />}
                     </div>
 
                     {item.unavailable ? (
