@@ -8,6 +8,7 @@ import { ME_APP, MY_ORDERS } from '@/lib/graphql';
 import { estaLogado, sair } from '@/lib/sessao';
 import { AuthModal } from '@/components/AuthModal';
 import { EVENTO_SESSAO } from '@/components/BotaoDaConta';
+import { ExcluirConta } from '@/components/ExcluirConta';
 
 /**
  * Minha conta: perfil e pedidos.
@@ -156,6 +157,8 @@ export default function ContaPage() {
                 </ul>
               )}
             </section>
+
+            <ExcluirConta />
           </>
         )}
       </main>
