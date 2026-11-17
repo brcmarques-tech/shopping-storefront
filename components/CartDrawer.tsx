@@ -236,7 +236,7 @@ export function CartDrawer({ open, onClose, onCheckout, storeOpen, finalizarEm, 
                             onClick={() =>
                               updateQuantity(item.productId, item.quantity + 1)
                             }
-                            disabled={item.stock != null && item.quantity >= item.stock}
+                            disabled={item.stock != null && item.stock > 0 && item.quantity >= item.stock}
                             className="w-6 h-6 rounded-full bg-[var(--brand-primary)] text-white flex items-center justify-center disabled:opacity-40"
                           >
                             <Plus size={12} />

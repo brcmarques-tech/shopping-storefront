@@ -119,7 +119,9 @@ export const useCart = create<CartStore>()(
         let mudouPreco = false;
         const items = state.items.map((i) => {
           const p = porId.get(i.productId);
-          if (!p || !p.isAvailable || (p.stock != null && p.stock <= 0)) {
+          // Esgotado = indisponível (a API desliga ao zerar estoque controlado).
+          // Estoque 0 com o produto disponível é ILIMITADO (painel: "0 = ilimitado").
+          if (!p || !p.isAvailable) {
             if (!i.unavailable) mudouPreco = true;
             return { ...i, unavailable: true };
           }
@@ -127,7 +129,7 @@ export const useCart = create<CartStore>()(
           const precoNovo = p.promotionalPrice || p.price;
           if (precoNovo !== precoAntigo) mudouPreco = true;
           const quantity =
-            !p.isVariableWeight && p.stock != null && i.quantity > p.stock ? p.stock : i.quantity;
+            !p.isVariableWeight && p.stock != null && p.stock > 0 && i.quantity > p.stock ? p.stock : i.quantity;
           return {
             ...i,
             name: p.name,
@@ -158,7 +160,7 @@ export const useCart = create<CartStore>()(
           // Unidade: soma +1, mas sem passar do estoque (a gaveta já limitava).
           if (!item.isVariableWeight) {
             const estoque = item.stock ?? existing.stock;
-            if (estoque != null && existing.quantity + item.quantity > estoque) return 'max';
+            if (estoque != null && estoque > 0 && existing.quantity + item.quantity > estoque) return 'max';
           }
           set({
             items: state.items.map((i) =>
